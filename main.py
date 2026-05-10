@@ -7,6 +7,11 @@ class App(tk.Tk):
         #Sets attributes for root frame using setters
         self.title("Quiz Builder")
         self.geometry("800x500")
+
+        self.score=0 
+        self.qsanswered= 0
+
+
         #creates a containter which stores all frames
         container= tk.Frame(self)
         container.grid(row=0, column=0, sticky="nsew")
@@ -26,7 +31,6 @@ class App(tk.Tk):
             frame.grid(row=0,column=0,sticky="nsew") # place each frame
         #method used to present a frame my raising it to the top of the stack
         self.showFrame(Login)
-
     def showFrame(self,frame):
         f= self.frames[frame]
         f.tkraise()
@@ -42,8 +46,9 @@ class Login(tk.Frame):
         for i in range(5):
             self.grid_rowconfigure(i,weight=1)
             self.grid_columnconfigure(i,weight=1)
-    
+        #creates a sub frame   
         container=tk.Frame(self)
+        #places in the middle of the current frame. I then place each widget in this sub frame so that they are centred
         container.grid(row=2,column=2)
         self.label=tk.Label(container, text= "Login", font=("Arial",20)).grid(row=0, column=1)
         #Displays username text and allows for text entry
@@ -79,8 +84,18 @@ class Quiz(tk.Frame):
         #maybe change into a 2D array, each item if the text[1],option[2-5]?
         #maybe initliase each item as an object in a new class, with option /correct option/ question attributes?
         #for now ill just have the text in an array
-        self.questionqueue=["QUESTION 1","Q2","Q3","Q4","Q5"]
+
+        #Mini data structure used to respresent questions relation in the database using a 2D ARRAY, where each array is a question
+        #array[0] represents question text, array[1-4] are the options, array[5] is the correct choice, and array[6] is the topic
+        self.questionqueue=[["QUESTION 1","a","b","c","d","b","TOPIC A"],
+                            ["Q2","1","2","3","4","3","TOPIC B"],
+                            ["Q3","MAR","VAR","PAR","RAM","MAR","TOPIC C"],
+                            ["Q4","X","Y","Z","W","W","TOPIC D"],
+                            ["Q5","1a","2b","3c","4b","4b","TOPIC E"]]
         self.questionnumber=0
+        self.optionsbuttons=[]
+
+
         super().__init__(parent)
         for i in range (5):
             self.grid_rowconfigure(i,weight=1)
@@ -90,21 +105,23 @@ class Quiz(tk.Frame):
 
         tk.Label(container,text="Quiz",font=("Arial",16)).grid(row=0,column=0)
 
-        self.question=tk.Label(container,text=self.questionqueue[self.questionnumber])
+        self.question=tk.Label(container,text=self.questionqueue[self.questionnumber][0])
         self.question.grid(row=1,column=0)
 
         self.answer_var = tk.StringVar()
 
         for i in range(4):
-            tk.Radiobutton(
-                container,
-                text=f"Option {i+1}",
-                variable=self.answer_var,
-                value=f"Option {i+1}"
+            #creates 4 selectable buttons and adds them to a list to be accessed later, storing each button is the answer_var variable
+            r=tk.Radiobutton(
+                container,#belongs to the sub frame
+                text=self.questionqueue[self.questionnumber][i+1],#defines text displayed 
+                variable=self.answer_var,#defines where value is stored
+                value=self.questionqueue[self.questionnumber][i+1]#defines what value is stored
 
-            ).grid(row=i+2,column=0)
-
-        submit=tk.Button(container,text="Submit",command=lambda:self.nextQuestion() )
+            )
+            r.grid(row=i+2,column=0)
+            self.optionsbuttons.append(r)
+        submit=tk.Button(container,text="Submit",command=lambda:self.nextQuestion(controller) )
         submit.grid(row=6,column=0)
 
         tk.Button(
@@ -114,10 +131,29 @@ class Quiz(tk.Frame):
         ).grid(row=7,column=0)
     
     #changes the text to the next question, passing in the frame, sub frame and question number to access
-    def nextQuestion(self):
-        self.question.config(text=self.questionqueue[self.questionnumber])
+    def nextQuestion(self,controller):
+
+        #checks if the selected answer is equal to the stored correct choice
+        if self.answer_var.get() == self.questionqueue[self.questionnumber][5]:
+            controller.score+=1
+
         #increments next item to access in the array   
         self.questionnumber+=1
+        controller.qsanswered+=1
+
+        #checks if all questions have been answered            
+        if controller.qsanswered==len(self.questionqueue):
+            controller.showFrame(Progress)
+            controller.frames[Progress].updateScore(controller)
+            return
+        self.question.config(text=self.questionqueue[self.questionnumber][0])
+        for x in range(4):
+            self.optionsbuttons[x].config(text=self.questionqueue[self.questionnumber][x+1],
+                                          value=self.questionqueue[self.questionnumber][x+1])
+
+        #checks if the selected answer is equal to the stored correct choice
+        if self.answer_var.get() == self.questionqueue[self.questionnumber][5]:
+            controller.score+=1
 class Dashboard(tk.Frame):
     def __init__(self,parent,controller):
         super().__init__(parent)
@@ -147,15 +183,14 @@ class Progress(tk.Frame):
             self.grid_rowconfigure(i,weight=1)
             self.grid_columnconfigure(i,weight=1)
         
-        container=tk.Frame(self)
-        container.grid(row=2,column=2)
-        title=tk.Label(container, text="Progress", font=("Arial",16))
+        self.container=tk.Frame(self)
+        self.container.grid(row=2,column=2)
+        title=tk.Label(self.container, text="Progress", font=("Arial",16))
         title.grid(row=0, column=1)
-        score=tk.Label(container, text="(SCORE) / (QUESTIONS)")
-        score.grid(row=2, column=1)
-        #if a question was wrong
-        #print question text
-        #print question answer
-
-ui=App()    
+        self.score=tk.Label(self.container,text="x")
+        self.score.grid(row=2, column=1)
+        
+    def updateScore(self,controller):
+        self.score.config(text= (controller.score,"/", controller.qsanswered))
+ui=App()   
 ui.mainloop()
