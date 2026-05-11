@@ -100,11 +100,16 @@ class Quiz(tk.Frame):
         for i in range (5):
             self.grid_rowconfigure(i,weight=1)
             self.grid_columnconfigure(i,weight=1)
-        container= tk.Frame(self)
-        container.grid(row=2,column=2)
+        self.container= tk.Frame(self)
+        self.container.grid(row=2,column=2)
 
-        tk.Label(container,text="Quiz",font=("Arial",16)).grid(row=0,column=0)
-
+        tk.Label(self.container,text="Quiz",font=("Arial",16)).grid(row=0,column=0)
+        self.startQuiz(self.container,controller)
+    def startQuiz(self,container,controller):
+        controller.qsanswered=0
+        self.questionnumber=0
+        controller.score=0
+        self.optionsbuttons.clear()
         self.question=tk.Label(container,text=self.questionqueue[self.questionnumber][0])
         self.question.grid(row=1,column=0)
 
@@ -129,14 +134,20 @@ class Quiz(tk.Frame):
             text="Back",
             command=lambda: controller.showFrame(Dashboard)
         ).grid(row=7,column=0)
-    
-    #changes the text to the next question, passing in the frame, sub frame and question number to access
-    def nextQuestion(self,controller):
-
+    def loadQuestion(self,container,controller):
+        self.answer_var.set("")
+        self.question.config(text=self.questionqueue[self.questionnumber][0])
+        for x in range(4):
+            self.optionsbuttons[x].config(text=self.questionqueue[self.questionnumber][x+1],
+                                          value=self.questionqueue[self.questionnumber][x+1])
+    def markQuestion(self,controller):
         #checks if the selected answer is equal to the stored correct choice
         if self.answer_var.get() == self.questionqueue[self.questionnumber][5]:
             controller.score+=1
-
+    
+    #changes the text to the next question, passing in the frame, sub frame and question number to access
+    def nextQuestion(self,controller):
+        self.markQuestion(controller=controller)
         #increments next item to access in the array   
         self.questionnumber+=1
         controller.qsanswered+=1
@@ -145,15 +156,11 @@ class Quiz(tk.Frame):
         if controller.qsanswered==len(self.questionqueue):
             controller.showFrame(Progress)
             controller.frames[Progress].updateScore(controller)
+            self.startQuiz(self.container,controller)
             return
-        self.question.config(text=self.questionqueue[self.questionnumber][0])
-        for x in range(4):
-            self.optionsbuttons[x].config(text=self.questionqueue[self.questionnumber][x+1],
-                                          value=self.questionqueue[self.questionnumber][x+1])
+        
+        self.loadQuestion(container=self.container,controller=controller)
 
-        #checks if the selected answer is equal to the stored correct choice
-        if self.answer_var.get() == self.questionqueue[self.questionnumber][5]:
-            controller.score+=1
 class Dashboard(tk.Frame):
     def __init__(self,parent,controller):
         super().__init__(parent)
@@ -187,9 +194,9 @@ class Progress(tk.Frame):
         self.container.grid(row=2,column=2)
         title=tk.Label(self.container, text="Progress", font=("Arial",16))
         title.grid(row=0, column=1)
-        self.score=tk.Label(self.container,text="x")
+        self.score=tk.Label(self.container,padx=5,pady=10)
         self.score.grid(row=2, column=1)
-        
+        tk.Button(self.container,text="Dashboard",command=lambda:controller.showFrame(Dashboard)).grid(row=3,column=1,ipadx=1.5)
     def updateScore(self,controller):
         self.score.config(text= (controller.score,"/", controller.qsanswered))
 ui=App()   
