@@ -6,22 +6,38 @@ accent_color = "#8317EE"
 white_color = "#FFFFFF"
 text_color = "#000000"
 text_color2 = "#8317EE"
+
+SIDEBAR_WIDTH = 220
+
+
 class controller():
     def __init__(self, root):
         self.root = root
+        self.root.controller = self
         self.frames = {Login:None, 
                        Dashboard:None}
 
         for i in (Login,Dashboard):
-            frame=i(parent=root,controller=self)
+            frame=i(parent=root.container,controller=self)
             self.frames[i]=frame # store the frame using self.frames
             frame.grid(row=0,column=0,sticky="nsew") # place each frame
         self.show_frame(Login) # show the login frame first
-
+        self.sidebar_visible = True
 
     def show_frame(self, frame_class):
         frame = self.frames[frame_class]
         frame.tkraise()  # bring the frame to the front
+
+    def toggle_sidebar(self):
+        if self.sidebar_visible:
+            # `place_forget` removes only the overlay; the page below it keeps
+            # exactly the same size because it is not sharing a grid column.
+            self.root.sidebar.place_forget()
+        else:
+            self.root.sidebar.place(x=0, y=0, width=SIDEBAR_WIDTH, relheight=1)
+
+        self.sidebar_visible = not self.sidebar_visible
+        self.root.update_toggle_button(self.sidebar_visible)
 
 
 class root(tk.Tk):
@@ -32,6 +48,51 @@ class root(tk.Tk):
         self.frames = {}
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
+
+        # The content always owns the whole window.  The sidebar is added with
+        # `place` below, so opening it does not push or shrink this container.
+        self.container = tk.Frame(self)
+        self.container.grid(row=0, column=0, sticky="nsew")
+        self.container.grid_rowconfigure(0, weight=1)
+        self.container.grid_columnconfigure(0, weight=1)
+
+        self.sidebar=sidebar(self)
+        self.sidebar.place(x=0, y=0, width=SIDEBAR_WIDTH, relheight=1)
+
+        # This lives on the root, not in a page header, so it remains usable
+        # no matter which page is currently raised.
+        self.toggle_button = tk.Button(
+            self,
+            text="✕",
+            font=("Helvetica", 14, "bold"),
+            bg=main_color,
+            fg=white_color,
+            activebackground=accent_color,
+            activeforeground=white_color,
+            relief="flat",
+            command=self.toggle_sidebar,
+        )
+        self.update_toggle_button(is_sidebar_visible=True)
+
+    def toggle_sidebar(self):
+        """Forward root-level toggle clicks to the shared controller."""
+        self.controller.toggle_sidebar()
+
+    def update_toggle_button(self, is_sidebar_visible):
+        """Keep the toggle accessible beside an open sidebar or at the edge."""
+        if is_sidebar_visible:
+            self.toggle_button.configure(text="✕")
+            self.toggle_button.place(x=SIDEBAR_WIDTH + 8, y=8, width=36, height=36)
+        else:
+            self.toggle_button.configure(text="☰")
+            self.toggle_button.place(x=8, y=8, width=36, height=36)
+
+        # Replacing the sidebar with `place` can bring it above other widgets.
+        # Raise the button again so there is always a visible way to close it.
+        self.toggle_button.lift()
+
+
+
 class Login(tk.Frame):
     def __init__(self, parent,controller):
         super().__init__(parent)
@@ -39,7 +100,6 @@ class Login(tk.Frame):
         self.create_layout()
         self.create_subframes()
         self.create_widgets()
-        self.sb=True
 
     def create_layout(self):
         self.grid_rowconfigure((0,1,2,3,4), weight=1)
@@ -104,7 +164,6 @@ class Dashboard(tk.Frame):
         self.main_content.grid_columnconfigure((0,1,2,3,4,5,6,7,8,9), weight=1)
         self.main_content.grid(row=1, column=0,rowspan=10,columnspan=11, sticky='nsew')
         self.main_content.grid_propagate(False)
-
         self.stats= tk.Frame(self.main_content, bg='#FFFFFF', relief='solid',bd=1)
         self.stats.grid(row=3, column =5 , rowspan=8, columnspan=5, sticky='nsew')
         self.stats.grid_propagate(False)
@@ -124,12 +183,12 @@ class Dashboard(tk.Frame):
         self.topics.grid_columnconfigure((0,1,2,3,4,5,6), weight=1)
 
 
+
     def create_widgets(self):
         self.title_label = tk.Label(self.header, text="Dashboard", font=("Helvetica", 24), bg=main_color, fg=white_color)
         self.title_label.grid(row=0, column=5, sticky='nsew')
         self.message_label = tk.Label(self.header, text="Welcome , Lewis", font=("Helvetica", 14), bg=main_color, fg=white_color)
         self.message_label.grid(row=1, column=5, sticky='nsew')
-
         self.progress_value = tk.IntVar(value=0)
         
         self.questionsanswered_label = tk.Label(self.stats, text="Questions Answered", font=("Helvetica", 14, "bold"), bg=white_color, fg=text_color)
@@ -163,6 +222,22 @@ class Dashboard(tk.Frame):
         self.quizzescompleted_label.grid(row=0, column=6, sticky='w', padx=(10,0))
         self.quizzescompleted_value = tk.Label(self.topics, text="0", font=("Helvetica", 14), bg=white_color, fg=text_color)
         self.quizzescompleted_value.grid(row=1, column=6, sticky='w', padx=(10,0))
+
+class sidebar(tk.Frame):
+    def __init__(self, parent):
+        super().__init__(parent, width=SIDEBAR_WIDTH, bg=main_color)
+        self.pack_propagate(False)
+        self.create_layout()
+        self.create_widgets()
+
+    def create_layout(self):
+        self.grid_rowconfigure((0,1,2,3,4,5,6,7,8,9), weight=1)
+        self.grid_columnconfigure(0, weight=1)
+
+    def create_widgets(self):
+        self.dashboard_button = tk.Button(self, text="Dashboard", font=("Helvetica", 14), bg=main_color, fg=white_color,
+                                          command=lambda: self.master.controller.show_frame(Dashboard))
+        self.dashboard_button.grid(row=0, column=0, sticky='ew', padx=10, pady=10)
 if __name__ == "__main__":
     app = root()
     controller = controller(app)
