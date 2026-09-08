@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
+import random as r
 
 main_color = "#2570C0"
 accent_color = "#7FD0FB"
@@ -20,8 +21,8 @@ class controller():
             frame=i(parent=root.container,controller=self)
             self.frames[i]=frame # store the frame using self.frames
             frame.grid(row=0,column=0,sticky="nsew") # place each frame
-        self.show_frame(Review) # show the login frame first
-        self.sidebar_visible = True
+        self.show_frame(Login) # show the login frame first
+        self.sidebar_visible = False
     def toggle_sidebar(self):
         if self.sidebar_visible:
             self.sidebar.grid_remove()  # hide the sidebar
@@ -128,7 +129,7 @@ class Dashboard(tk.Frame):
         self.progress= tk.Frame(self.main_content, bg='#FFFFFF', relief='solid',bd=1)
         self.progress.grid(row=3, column =0 , rowspan=8, columnspan=5, sticky='nsew')
         self.progress.grid_propagate(False)
-        self.progress.grid_rowconfigure((0,1,2,3,4), weight=1)
+        self.progress.grid_rowconfigure((0,1,2,3,4,5,6,7,8,9), weight=1)
         self.progress.grid_columnconfigure((0,1,2,3,4), weight=1)
 
         self.topics= tk.Frame(self.main_content, bg='#FFFFFF', relief='solid',bd=1)
@@ -158,13 +159,13 @@ class Dashboard(tk.Frame):
         self.topic_value.grid(row=5, column=0, sticky='w', padx=(10,0))
         
         self.progress_label = tk.Label(self.progress, text="Topic Completion", font=("Helvetica", 14, "bold"), bg=white_color, fg=text_color)
-        self.progress_label.grid(row=0, column=2, sticky='w', padx=(10,0))
+        self.progress_label.grid(row=0, column=0, sticky='w', padx=(10,0))
         self.topic1_label = tk.Label(self.progress, text="Topic 1: 100%", font=("Helvetica", 14), bg=white_color, fg=text_color)
-        self.topic1_label.grid(row=1, column=2, sticky='w', padx=(10,0))
+        self.topic1_label.grid(row=2, column=0, sticky='w', padx=(10,0))
         self.topic2_label = tk.Label(self.progress, text="Topic 2: 75%", font=("Helvetica", 14), bg=white_color, fg=text_color)
-        self.topic2_label.grid(row=2, column=2, sticky='w', padx=(10,0))
+        self.topic2_label.grid(row=4, column=0, sticky='w', padx=(10,0))
         self.topic3_label = tk.Label(self.progress, text="Topic 3: 50%", font=("Helvetica", 14), bg=white_color, fg=text_color)
-        self.topic3_label.grid(row=3, column=2, sticky='w', padx=(10,0))
+        self.topic3_label.grid(row=6, column=0, sticky='w', padx=(10,0))
 
         self.besttopic_label = tk.Label(self.topics, text="Best Topic", font=("Helvetica", 14, "bold"), bg=white_color, fg=text_color)
         self.besttopic_label.grid(row=0, column=0, sticky='w', padx=(10,0))
@@ -178,6 +179,18 @@ class Dashboard(tk.Frame):
         self.quizzescompleted_label.grid(row=0, column=6, sticky='w', padx=(10,0))
         self.quizzescompleted_value = tk.Label(self.topics, text="0", font=("Helvetica", 14), bg=white_color, fg=text_color)
         self.quizzescompleted_value.grid(row=1, column=6, sticky='w', padx=(10,0))
+
+        self.progressbar=ttk.Progressbar(self.progress,orient='horizontal',length=300,mode='determinate')
+        self.progressbar.step(60)
+        self.progressbar.grid(row=3,column=0)
+
+        for i in range(9):
+            progressbar=ttk.Progressbar(self.progress,orient='horizontal',length=300,mode='determinate')
+            progressbar.step(self.get_progress())
+            if i != 1 and i % 2 !=0:
+                progressbar.grid(row=i,column=0)
+    def get_progress(self):
+        return r.randint(0,100)
 
         
 class Quiz(tk.Frame):
@@ -342,55 +355,49 @@ class Review(tk.Frame):
 
         self.sidebar_button = tk.Button(self.header, text="☰", font=("Helvetica", 14), bg=main_color, fg=white_color, relief='flat', command=self.controller.toggle_sidebar)
         self.sidebar_button.grid(row=0, column=0, sticky='w', padx=(10,0))
-        
+    
 class sidebar(tk.Frame):
     def __init__(self, parent, controller):
-        super().__init__(parent, bg=main_color)
+        super().__init__(parent, bg="#2570C0")
         self.controller = controller
-        self.setup_style()
         self.create_widgets()
         self.create_layout()
 
-    def setup_style(self):
-        style = ttk.Style()
-        style.theme_use('clam')  # 'clam' respects custom colors; mac default ('aqua') doesn't
-
-        style.configure(
-            "Sidebar.TButton",
-            background=main_color,
-            foreground=white_color,
-            font=("Helvetica", 14),
-            borderwidth=0,
-            focuscolor=main_color,
-            relief='flat',
-        )
-        style.map(
-            "Sidebar.TButton",
-            background=[('active', accent_color)],  # color while pressed/hovered
-            foreground=[('active', white_color)],
-        )
 
     def create_layout(self):
         self.grid_rowconfigure((0,1,2,3,4,5,6,8,9), weight=1)
 
     def create_widgets(self):
-        self.dashboard_button = ttk.Button(
-            self, text="Dashboard", style="Sidebar.TButton",
+        self.dashboard_button = tk.Button(
+            self, text="Dashboard",bg=white_color,fg=main_color,
             command=lambda: self.controller.show_frame(Dashboard)
         )
         self.dashboard_button.grid(row=4, column=0, sticky="ew")
 
-        self.quiz_button = ttk.Button(
-            self, text="Quiz", style="Sidebar.TButton",
+        self.quiz_button = tk.Button(
+            self, text="Quiz", bg=white_color,fg=main_color,
             command=lambda: self.controller.show_frame(Quiz)
         )
         self.quiz_button.grid(row=2, column=0, sticky="ew")
 
-        self.review_button = ttk.Button(
-            self, text="Review", style="Sidebar.TButton",
+        self.review_button = tk.Button(
+            self, text="Review",bg=white_color,fg=main_color,
             command=lambda: self.controller.show_frame(Review)
         )
         self.review_button.grid(row=6, column=0, sticky="ew")
+
+
+class createQuestions(tk.Frame):
+    def __init__(self,parent,controller):
+        super.__init__(parent,bg=white_color)
+
+        self.controller=controller
+        self.create_layout()
+        self.create_subframes()
+        self.create_widgets()
+
+    def create_layout():
+        pass
 if __name__ == "__main__":
     app = root()
     controller = controller(app)
