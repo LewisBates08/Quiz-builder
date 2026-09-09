@@ -15,9 +15,10 @@ class controller():
         self.frames = {Login:None, 
                        Dashboard:None,
                        Quiz:None,
-                       Review:None}
+                       Review:None,
+                       Create:None}
 
-        for i in (Login,Dashboard,Quiz,Review):
+        for i in (Login,Dashboard,Quiz,Review,Create):
             frame=i(parent=root.container,controller=self)
             self.frames[i]=frame # store the frame using self.frames
             frame.grid(row=0,column=0,sticky="nsew") # place each frame
@@ -55,6 +56,7 @@ class Login(tk.Frame):
         self.create_layout()
         self.create_subframes()
         self.create_widgets()
+        self.controller.sidebar.grid_remove()
 
     def create_layout(self):
         self.grid_rowconfigure((0,1,2,3,4), weight=1)
@@ -119,7 +121,6 @@ class Dashboard(tk.Frame):
         self.main_content.grid_columnconfigure((0,1,2,3,4,5,6,7,8,9), weight=1)
         self.main_content.grid(row=1, column=0,rowspan=10,columnspan=11, sticky='nsew')
         self.main_content.grid_propagate(False)
-        self.sidebar_button=tk.Button(self.header, text="☰", font=("Helvetica", 14), bg=main_color, fg=white_color, relief='flat')
         self.stats= tk.Frame(self.main_content, bg='#FFFFFF', relief='solid',bd=1)
         self.stats.grid(row=3, column =5 , rowspan=8, columnspan=5, sticky='nsew')
         self.stats.grid_propagate(False)
@@ -145,6 +146,9 @@ class Dashboard(tk.Frame):
         self.title_label.grid(row=0, column=5, sticky='nsew')
         self.message_label = tk.Label(self.header, text="Welcome , Lewis", font=("Helvetica", 14), bg=main_color, fg=white_color)
         self.message_label.grid(row=1, column=5, sticky='nsew')
+        self.sidebar_button=tk.Button(self.header, text="☰", font=("Helvetica", 14), bg=main_color,
+                                       fg=white_color, relief='flat',command= lambda: self.controller.toggle_sidebar())
+        self.sidebar_button.grid(row=0,column=0,columnspan=1,rowspan=2,sticky='nsew')
 
         self.progress_value = tk.IntVar(value=0)
         
@@ -385,19 +389,58 @@ class sidebar(tk.Frame):
             command=lambda: self.controller.show_frame(Review)
         )
         self.review_button.grid(row=6, column=0, sticky="ew")
+        
+        self.createbutton=tk.Button(self,text='Create Question',
+        bg=white_color,fg=main_color,
+        command=lambda:self.controller.show_frame(Create))
+        self.createbutton.grid(row=8,column=0,sticky='ew')
 
 
-class createQuestions(tk.Frame):
+class Create(tk.Frame):
     def __init__(self,parent,controller):
-        super.__init__(parent,bg=white_color)
+        super().__init__(parent,bg=white_color)
 
         self.controller=controller
         self.create_layout()
         self.create_subframes()
         self.create_widgets()
 
-    def create_layout():
-        pass
+    def create_layout(self):
+        self.grid_rowconfigure((0,1,2,3,4,5,6,7,8,9),weight=1)
+        self.grid_columnconfigure((0,1,2,3,4,5,6,7,8,9),weight=1)
+
+    def create_subframes(self):
+        self.header=tk.Frame(self,bg=main_color)
+        self.header.grid(row=0,column=0,sticky="nsew",columnspan=10,rowspan=1)
+        self.header.grid_columnconfigure((0,1,2,3,4,5,6,7,8,9),weight=1)
+        self.main_content=tk.Frame(self,bg=white_color)
+        self.main_content.grid(row=1,column=0,columnspan=10,rowspan=9,sticky="nsew")
+        self.main_content.grid_rowconfigure((0,1,2,3,4,5,6,7,8,9),weight=1)
+        self.main_content.grid_columnconfigure((0,1,2,4,5,6,7,8,9),weight=1)
+
+    def create_widgets(self):
+        self.text_label=tk.Label(self.main_content,text='Question Text:',fg=text_color,bg=white_color, font=("Helvetica", 14))
+        self.text_label.grid(row=1,column=0,sticky='w',padx=(10,0))
+        self.question_text = tk.Entry(self.main_content, font=("Helvetica", 14),relief='solid', bg="#D5CECE")
+        self.question_text.grid(row=1, column=1, sticky='w')
+
+        self.distractorlabels=tk.Label(self.main_content,text='Distractor Responses',
+                                       fg=text_color,bg=white_color, font=("Helvetica", 14))
+        for i in range(3,6):
+            f=tk.Label(self.main_content,text=f'Distractor {i-2}',fg=text_color,bg=white_color, font=("Helvetica", 14))
+            f.grid(row=i,column=0,sticky='w')
+
+        self.distractor1=tk.Entry(self.main_content,font=('Helvetica',14),relief="solid",bg='#D5CECE')
+        self.distractor2=tk.Entry(self.main_content,font=('Helvetica',14),relief="solid",bg='#D5CECE')
+        self.distractor3=tk.Entry(self.main_content,font=('Helvetica',14),relief="solid",bg='#D5CECE')
+        self.distractor1.grid(row=3,column=1,sticky='ew')
+        self.distractor2.grid(row=4,column=1,sticky='ew')
+        self.distractor3.grid(row=5,column=1,sticky='ew')
+
+        self.correct_answer=tk.Entry(self.main_content,font=('Helvetica',14),relief="solid",bg="#7CFC62")
+        self.correct_answer.grid(row=7,column=1,sticky='w')
+
+
 if __name__ == "__main__":
     app = root()
     controller = controller(app)
