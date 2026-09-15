@@ -16,9 +16,10 @@ class controller():
                        Dashboard:None,
                        Quiz:None,
                        Review:None,
-                       Create:None}
+                       Create:None,
+                       signUp:None}
 
-        for i in (Login,Dashboard,Quiz,Review,Create):
+        for i in (Login,Dashboard,Quiz,Review,Create,signUp):
             frame=i(parent=root.container,controller=self)
             self.frames[i]=frame # store the frame using self.frames
             frame.grid(row=0,column=0,sticky="nsew") # place each frame
@@ -33,12 +34,18 @@ class controller():
     def show_frame(self, frame_class):
         buttons={Login:self.sidebar.login,
                  Dashboard:self.sidebar.dashboard,
-                 Quiz:self.sidebar.quiz}
+                 Quiz:self.sidebar.quiz,
+                 Review: self.sidebar.review,
+                 Create: self.sidebar.create}
         frame = self.frames[frame_class]
         for i in buttons.values():
             i.config(bg=white_color)
-        buttons[frame_class].config(bg="#00B7FF")
-        frame.tkraise()  # bring the frame to the front
+        try:
+            buttons[frame_class].config(bg="#00B7FF")
+        except:
+            pass
+        frame.tkraise() # bring the frame to the front
+        self.sidebar.grid_remove()
 
 class root(tk.Tk):
     def __init__(self):
@@ -99,7 +106,15 @@ class Login(tk.Frame):
                                       font=("Helvetica", 14),
                                       fg=text_color, bg=accent_color, 
                                       relief='raised',command=lambda: self.controller.show_frame(Dashboard))
-        self.login_button.grid(row=5, column=4, sticky= 'ew', padx=(10,0))
+        self.login_button.grid(row=5, column=4, ipadx=10)
+
+        self.signup_button = tk.Button(self.main_content, text="Sign Up", 
+                                      font=("Helvetica", 14),
+                                      fg=text_color, bg=accent_color, 
+                                      relief='raised',command=lambda: self.controller.show_frame(signUp))
+        self.signup_button.grid(row=6, column=4)
+
+        
 
 
 class Dashboard(tk.Frame):
@@ -246,6 +261,10 @@ class Quiz(tk.Frame):
         self.previous_button.grid(row=0, column=1, sticky='w')
         self.next_button = tk.Button(self.stats, text="Next", font=("Helvetica", 14), bg=white_color, fg=text_color, relief='raised')
         self.next_button.grid(row=0, column=2, sticky='w')
+        self.quit_button = tk.Button(self.stats, text= 'Quit', font=("Helvetica",14), bg= white_color, fg=text_color, relief='raised',command=lambda:self.controller.show_frame(Dashboard)  )
+        self.quit_button.grid(row=0 ,column= 3,sticky='w')
+
+
 
         self.question_number_label = tk.Label(self.question, text="What does WAP stand for?", font=("Helvetica", 14), bg=white_color, fg=text_color)
         self.question_number_label.grid(row=0, column=0,sticky='nsew',columnspan=9, padx=(10,0))
@@ -403,6 +422,8 @@ class sidebar(tk.Frame):
         command=lambda:self.controller.show_frame(Create))
         self.create.grid(row=10,column=0,sticky='ew')
 
+        
+
 
 class Create(tk.Frame):
     def __init__(self,parent,controller):
@@ -467,8 +488,50 @@ class Create(tk.Frame):
         self.topic.grid(row=1 ,column= 6,sticky='ew')
         self.sidebar_button = tk.Button(self.header, text="☰", font=("Helvetica", 14), bg=main_color, fg=white_color, relief='flat', command=self.controller.toggle_sidebar)
         self.sidebar_button.grid(row=0, column=0, sticky='w', padx=(10,0))
+class signUp(tk.Frame):
+    def __init__(self,parent,controller):
+        super().__init__(parent,bg=white_color)
+    
+        self.controller=controller
+        self.create_layout()
+        self.create_subframes()
+        self.create_widgets()
 
+    def create_layout(self):
+        self.grid_rowconfigure((0,1,2,3,4,5,6,7,8,9),weight=1)
+        self.grid_columnconfigure((0,1,2,3,4,5,6,7,8,9),weight=1)
 
+    def create_subframes(self):
+        self.header= tk.Frame(self, bg=main_color)
+        self.header.grid(row=0, column=0, columnspan=10, sticky='nsew')
+        self.header.grid_propagate(False)
+        self.header.grid_rowconfigure(0, weight=2)
+        self.header.grid_rowconfigure(1, weight=1)
+        self.header.grid_columnconfigure((0,1,2,3,4,5,6,7,8,9,10), weight=1)
+        self.main_content=tk.Frame(self,bg=white_color)
+        self.main_content.grid(row=1,column=0,columnspan=10,rowspan=9,sticky="nsew")
+        self.main_content.grid_rowconfigure((0,1,2,3,4,5,6,7,8,9),weight=1)
+        self.main_content.grid_columnconfigure((0,1,2,4,5,6,7,8,9),weight=1)
+    def create_widgets(self):
+        self.title_label = tk.Label(self.header, text="Sign Up", font=("Helvetica", 24), bg=main_color, fg=white_color)
+        self.title_label.grid(row=0, column=0, columnspan=10,sticky='nsew')
+        self.username_label = tk.Label(self.main_content, text="Username:", font=("Helvetica", 14), bg=white_color, fg=text_color)
+        self.username_label.grid(row=2, column=0, columnspan=9)
+        self.username_entry = tk.Entry(self.main_content, font=("Helvetica", 14),relief='solid', bg="#D5CECE")
+        self.username_entry.grid(row=3, column=0, columnspan=9)
+
+        self.password_label = tk.Label(self.main_content, text="Password:", font=("Helvetica", 14), bg=white_color, fg=text_color)
+        self.password_label.grid(row=4, column=0, columnspan=9)
+        self.password_entry = tk.Entry(self.main_content, show="*", font=("Helvetica", 14),relief='solid', bg="#D5CECE")
+        self.password_entry.grid(row=5, column=0, columnspan=9)
+
+        self.signUp_button = tk.Button(self.main_content, text="Create Account", 
+                                        font=("Helvetica", 14),
+                                        fg=text_color, bg=accent_color, 
+                                        relief='raised',command=lambda: self.controller.show_frame(Dashboard))
+        self.signUp_button.grid(row=6, column=0, columnspan=9)
+    
+    
 if __name__ == "__main__":
     app = root()
     controller = controller(app)
