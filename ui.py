@@ -1,12 +1,28 @@
 import tkinter as tk
 from tkinter import ttk
 import random as r
+from dataclasses import dataclass
 
 main_color = "#2570C0"
 accent_color = "#7FD0FB"
 white_color = "#FFFFFF"
 text_color = "#000000"
 text_color2 = "#8317EE"
+minidb=[["QUESTION 1","a","b","c",'d',"TOPIC A"],
+                            ["Q2","1","2","3","4","TOPIC B"],
+                            ["Q3","MAR","VAR","PAR","RAM","TOPIC C"],
+                            ["Q4","X","Y","Z","W","TOPIC D"],
+                            ["Q5","1a","2b","3c","4b","TOPIC E"]]
+
+@dataclass
+class Question():
+    text:str
+    distractor1:str
+    distractor2: str
+    distractor3: str
+    correct: str
+    topic: int
+    user: int | None = None
 class controller():
     def __init__(self, root):
         self.root = root
@@ -222,9 +238,15 @@ class Quiz(tk.Frame):
     def __init__(self,parent,controller):
         super().__init__(parent)
         self.controller = controller
+        self.quiz_state= True
+        self.questionanswered=0
+        self.questionqueue=[0,1,2,3,4]
+        self.currentquestionindex=0
+        self.responses=['x','x','x','x','x']
         self.create_layout()
         self.create_subframes()
         self.create_widgets()
+        self.resetQuiz()
     def create_layout(self):
         self.grid_rowconfigure((0,1,2,3,4,5,6,7,8,9), weight=1)
         self.grid_columnconfigure((0,1,2,3,4,5,6,7,8,9), weight=1)
@@ -248,8 +270,10 @@ class Quiz(tk.Frame):
         self.stats.grid_rowconfigure((0,1,2,3,4), weight=1)
         self.stats.grid_columnconfigure((0,1,2,3,4,5,6,7,8,9), weight=1)
 
-
+    def questionsremaining(self):
+        return (len(self.questionqueue)-self.currentquestionindex)
     def create_widgets(self):
+        # IMPLEMENT A FUNCTION THAT PREVENTS THE USER FROM SUBMITTING THE FINAL QUESTION IS PREVIOUS QUESTIONS DO NOT HAVE A RESPONSE
         self.title_label = tk.Label(self.header, text="Quiz", font=("Helvetica", 24), bg=main_color, fg=white_color)
         self.title_label.grid(row=0, column=0, sticky='nsew',columnspan=10)
 
@@ -257,17 +281,19 @@ class Quiz(tk.Frame):
         self.question_number_label.grid(row=0, column=0, sticky='w', padx=(10,0))
         self.questions_remaining_label = tk.Label(self.stats, text="Questions Remaining: 9", font=("Helvetica", 14), bg=white_color, fg=text_color)
         self.questions_remaining_label.grid(row=0, column=9, sticky='e', padx=(0,10))
-        self.previous_button = tk.Button(self.stats, text="Previous", font=("Helvetica", 14), bg=white_color, fg=text_color, relief='raised')
+        self.previous_button = tk.Button(self.stats, text="Previous", font=("Helvetica", 14), bg=white_color, fg=text_color, relief='raised',command=self.previousQuestion)
         self.previous_button.grid(row=0, column=1, sticky='w')
-        self.next_button = tk.Button(self.stats, text="Next", font=("Helvetica", 14), bg=white_color, fg=text_color, relief='raised')
+
+        # CREATE A SEPERATE FUNCTION TO MOVE TO THE NEXT QUESTION WITHOUT SUBMITTING RESPONSE
+        self.next_button = tk.Button(self.stats, text="Next", font=("Helvetica", 14), bg=white_color, fg=text_color, relief='raised',command=self.nextQuestion)
         self.next_button.grid(row=0, column=2, sticky='w')
-        self.quit_button = tk.Button(self.stats, text= 'Quit', font=("Helvetica",14), bg= white_color, fg=text_color, relief='raised',command=lambda:self.controller.show_frame(Dashboard)  )
+        self.quit_button = tk.Button(self.stats, text= 'Quit', font=("Helvetica",14), bg= white_color, fg=text_color, relief='raised',command=self.quitQuiz)
         self.quit_button.grid(row=0 ,column= 3,sticky='w')
 
 
 
-        self.question_number_label = tk.Label(self.question, text="What does WAP stand for?", font=("Helvetica", 14), bg=white_color, fg=text_color)
-        self.question_number_label.grid(row=0, column=0,sticky='nsew',columnspan=9, padx=(10,0))
+        self.question_text = tk.Label(self.question, text="What does WAP stand for?", font=("Helvetica", 14), bg=white_color, fg=text_color)
+        self.question_text.grid(row=0, column=0,sticky='nsew',columnspan=9, padx=(10,0))
         self.indicator = tk.Label(self.question,bg=main_color)
         self.answer = tk.StringVar()
         self.option1 = tk.Radiobutton(self.question, text=" Wireless Application Protocol", 
@@ -301,15 +327,102 @@ class Quiz(tk.Frame):
 
     def submit_answer(self):
         selected_answer = self.answer.get()
-        print(f"Selected answer: {selected_answer}")
-        # Here you can add logic to check the answer and update the quiz state
+        self.answer.set('x')
+        self.responses[self.currentquestionindex]=(selected_answer)
+        self.nextQuestion()
     def setindicator(self, selected_option):
         # Reset the background color of all options
         for option in [self.option1, self.option2, self.option3, self.option4]:
             option.config(bg=white_color)
         # Set the background color of the selected option
         selected_option.config(bg=accent_color)
+    def allsubmitted(self):
+        for i in self.responses:
+            print(i)
+            if i == None or i == 'x':
+                print('false')
+                return False
+        return True
+        
+    def nextQuestion(self):
+        try:
+            self.error.grid_forget()
+        except:
+            pass
+        
+        if self.questionanswered < len(self.questionqueue):
+            print(self.responses)
+            self.display_question(self.questionqueue[self.currentquestionindex])
+            for option in [self.option1, self.option2, self.option3, self.option4]:
+                option.config(bg=white_color)
+            self.questionanswered+=1
+            self.currentquestionindex+=1
+        elif self.currentquestionindex == len(self.questionqueue): # quiz complete successfully
+            if self.allsubmitted:
+                self.quiz_state=False
+                self.controller.show_frame(Review)
+                self.resetQuiz()
+            else:
+                self.redoQuestion
+        else:
+            #display the question where the response == None
+            while self.allsubmitted != True:
+                self.redoQuestion()
 
+    def redoQuestion(self):
+        for i in range (len(self.responses)):
+            if self.responses [i] == 'x':
+                self.display_question(self.questionqueue[i])
+    def previousQuestion(self):
+        if self.currentquestionindex > 0:
+            self.currentquestionindex-=1
+            self.display_question(self.questionqueue[self.currentquestionindex])
+            for option in [self.option1, self.option2, self.option3, self.option4]:
+                option.config(bg=white_color)
+        else:
+            self.error=tk.Label(self.stats, text="No Previous Questions", font=("Helvetica", 18,'bold'), bg=white_color, fg="#DB0000")
+            self.error.grid(row=0,column=4,sticky='ew')
+
+            
+
+    def display_question(self,questionnum):
+            self.question_number_label.config(text=f'Question {self.currentquestionindex}')
+            self.questions_remaining_label.config(text=f'Questions Remaining: {self.questionsremaining()}')
+            question=self.loadQuestion(questionnum)
+            self.question_text.config(text=question.text)
+            options=[question.distractor1,question.distractor2,question.distractor3,question.correct]
+            #r.shuffle(options)
+            self.option1.config(text=options[0],value=options[0])
+            self.option2.config(text=options[1],value=options[1])
+            self.option3.config(text=options[2],value=options[2])
+            self.option4.config(text=options[3],value=options[3])
+
+
+
+    def loadQuestion(self,questionnum): # This will interact with the database in the real project, seperating database code from program logic
+        questiondata=minidb[questionnum]
+        text,opt1,opt2,opt3,correct,topic=questiondata
+        question=Question(text=text,
+                            distractor1=opt1,
+                            distractor2=opt2,
+                            distractor3=opt3,
+                            correct=correct,
+                            topic=topic)
+        return question 
+
+    def resetQuiz(self):
+        self.answer.set('x')
+        self.currentquestionindex=0
+        self.display_question(self.currentquestionindex)
+        for option in [self.option1, self.option2, self.option3, self.option4]:
+            option.config(bg=white_color)
+        try:
+            self.error.grid_forget()
+        except: 
+            pass 
+    def quitQuiz(self):
+        self.controller.show_frame(Dashboard)
+        self.resetQuiz()
 
 class Review(tk.Frame):
     def __init__(self,parent,controller):
