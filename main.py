@@ -255,7 +255,6 @@ class Quiz(tk.Frame):
             self.optionsbuttons[x].config(text=option,value=option)
 
     def markQuestion(self,controller):
-        #checks if the selected answer is equal to the stored correct choice
         if self.answer_var.get() == self.currentCorrectAnswer():
             controller.score+=1
 
@@ -267,15 +266,11 @@ class Quiz(tk.Frame):
         controller.frames[Progress].updateScore(controller)
         controller.quizzesTaken+=1
         self.startQuiz(controller)
-    
-    #changes the text to the next question, passing in the frame, sub frame and question number to access
     def nextQuestion(self,controller):
-        self.markQuestion(controller=controller)
-        #increments next item to access in the array   
+        self.markQuestion(controller=controller) 
         self.questionnumber+=1
         controller.qsanswered+=1
-
-        #checks if all questions have been answered            
+                   
         if self.quizFinished(controller):
             self.finishQuiz(controller)
             return
