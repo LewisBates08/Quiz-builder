@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?><sqlb_project><db path="" readonly="0" foreign_keys="" case_sensitive_like="" temp_store="" wal_autocheckpoint="" synchronous=""/><attached/><window><main_tabs open="structure browser pragmas query" current="3"/></window><tab_structure><column_width id="0" width="300"/><column_width id="1" width="0"/><column_width id="2" width="100"/><column_width id="3" width="1756"/><column_width id="4" width="0"/></tab_structure><tab_browse><table title="." custom_title="0" dock_id="2" table="0,0:"/><dock_state state="000000ff00000000fd000000010000000200000536000003e1fc0100000002fb000000160064006f0063006b00420072006f00770073006500310100000000000005360000000000000000fb000000160064006f0063006b00420072006f00770073006500320100000000ffffffff0000010100ffffff000002a10000000000000004000000040000000800000008fc00000000"/><default_encoding codec=""/><browse_table_settings/></tab_browse><tab_sql><sql name="SQL 1*">INSERT INTO Questions
+(question_text, choice1, choice2, choice3, correct_choice, topic_id, user_id)
+VALUES
+
+-- Topic 1: Systems Architecture
+(
+    'What is the purpose of the Program Counter (PC)?',
+    'Stores the current instruction',
+    'Stores the result of arithmetic operations',
+    'Stores data retrieved from memory',
+    'Stores the address of the next instruction',
+    1,
+    NULL
+),
+
+(
+    'Which register stores the address of a memory location being accessed?',
+    'Memory Data Register',
+    'Current Instruction Register',
+    'Accumulator',
+    'Memory Address Register',
+    1,
+    NULL
+),
+
+(
+    'What is the primary function of the ALU?',
+    'Manage memory allocation',
+    'Control input and output devices',
+    'Store program instructions',
+    'Perform arithmetic and logical operations',
+    1,
+    NULL
+),
+
+(
+    'What does the control bus carry?',
+    'Memory addresses',
+    'Data between the CPU and RAM',
+    'Program instructions',
+    'Control signals between components',
+    1,
+    NULL
+),
+
+-- Topic 2: Software
+(
+    'What is the primary function of an operating system?',
+    'Translate high-level programming languages',
+    'Compile source code',
+    'Store data permanently',
+    'Manage hardware resources and provide services for applications',
+    2,
+    NULL
+),
+
+(
+    'Which scheduling algorithm allocates each process a fixed time slice?',
+    'First Come First Served',
+    'Shortest Job First',
+    'Shortest Remaining Time',
+    'Round Robin',
+    2,
+    NULL
+),
+
+(
+    'What is the purpose of a compiler?',
+    'Execute source code one line at a time',
+    'Manage CPU scheduling',
+    'Allocate virtual memory',
+    'Translate source code into machine code',
+    2,
+    NULL
+),
+
+-- Topic 3: Data Structures
+(
+    'Which data structure operates using Last In First Out (LIFO)?',
+    'Queue',
+    'Linked List',
+    'Graph',
+    'Stack',
+    3,
+    NULL
+),
+
+(
+    'Which data structure operates using First In First Out (FIFO)?',
+    'Stack',
+    'Binary Search Tree',
+    'Hash Table',
+    'Queue',
+    3,
+    NULL
+),
+
+(
+    'What is the worst-case time complexity of binary search?',
+    'O(n)',
+    'O(n^2)',
+    'O(1)',
+    'O(log n)',
+    3,
+    NULL
+),
+
+-- Topic 4: Networks
+(
+    'Which protocol is responsible for resolving domain names into IP addresses?',
+    'HTTP',
+    'FTP',
+    'SMTP',
+    'DNS',
+    4,
+    NULL
+),
+
+(
+    'Which layer of the TCP/IP model is responsible for routing packets between networks?',
+    'Application',
+    'Transport',
+    'Link',
+    'Internet',
+    4,
+    NULL
+),
+
+(
+    'What is the main purpose of a firewall?',
+    'Increase network bandwidth',
+    'Convert domain names into IP addresses',
+    'Store network traffic',
+    'Monitor and filter network traffic based on security rules',
+    4,
+    NULL
+),
+
+-- Topic 5: Algorithms
+(
+    'What is the worst-case time complexity of bubble sort?',
+    'O(n)',
+    'O(log n)',
+    'O(1)',
+    'O(n^2)',
+    5,
+    NULL
+),
+
+(
+    'Which algorithm finds the shortest path in a graph with non-negative edge weights?',
+    'Bubble Sort',
+    'Binary Search',
+    'Merge Sort',
+    'Dijkstra Algorithm',
+    5,
+    NULL
+);</sql><sql name="SQL 2*">INSERt</sql><current_tab id="1"/></tab_sql></sqlb_project>

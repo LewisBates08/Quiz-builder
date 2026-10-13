@@ -5,11 +5,14 @@ import random as r
 from dataclasses import dataclass
 import sqlite3 as sql
 
+from click import progressbar
+
 main_color = "#2570C0"
 accent_color = "#7FD0FB"
 white_color = "#FFFFFF"
 text_color = "#000000"
 text_color2 = "#8317EE"
+error_color = "#DB0000"
 minidb=[["QUESTION 1","a","b","c",'d',"TOPIC A"],
                             ["Q2","1","2","3","4","TOPIC B"],
                             ["Q3","MAR","VAR","PAR","RAM","TOPIC C"],
@@ -25,12 +28,21 @@ class Question():
     correct: str
     topic: int
     user: int | None = None
+@dataclass
+class uprogress():
+    topic: str
+    numberQsAttempted: int
+    numberQsCorrect: int
+    total_questions: int
+    topic_completion: float
+    
 class controller():
     def __init__(self, root):
         self.root = root
         self.database = database(controller=self)
         self.sidebar = sidebar(self.root, self)
         self.sidebar.grid(row=0, column=0, sticky="ns")  # place the sidebar
+        self.current_user = None  
         self.frames = {Login:None, 
                        Dashboard:None,
                        Quiz:None,
@@ -64,9 +76,7 @@ class controller():
             pass
         frame.tkraise() # bring the frame to the front
         self.sidebar.grid_remove()
-    def display_null(self, frame):
-        self.error=tk.Label(self.frames[frame], text="Username or Password cannot be empty", font=("Helvetica", 14), bg=white_color, fg="#DB0000")
-        self.error.grid(row=9, column=4, sticky='ew')
+
 
 class database():
     def __init__(self,controller):
@@ -76,12 +86,14 @@ class database():
         self.cursor.execute("PRAGMA foreign_keys = ON")  # Enable foreign key support
         self.create_database()
     def create_database(self):
+        #====USERS=====
         self.cursor.execute('''CREATE TABLE IF NOT EXISTS users(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL UNIQUE,
             password TEXT NOT NULL,
             creation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )''')
+        #============QUESTIONS ======
         self.cursor.execute('''CREATE TABLE IF NOT EXISTS questions(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             question_text TEXT NOT NULL,
@@ -94,21 +106,110 @@ class database():
             FOREIGN KEY (user_id) REFERENCES users(id)
             FOREIGN KEY (topic_id) REFERENCES topics(id)
         )''')
+
+        #=======TOPICS======
         self.cursor.execute('''CREATE TABLE IF NOT EXISTS topics(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             topic_name TEXT NOT NULL,
             total_questions INTEGER,
             topic_difficulty INTEGER
         )''')
+        #======QUIZZES======
+        self.cursor.execute(''' CREATE TABLE IF NOT EXISTS quizzes(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            accuracy REAL,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )''')
+        #=USER_QUESTIONS=========
+        self.cursor.execute('''CREATE TABLE IF NOT EXISTS user_questions(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            question_id INTEGER,
+            user_answer TEXT,
+            is_correct BOOLEAN,
+            attempt_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (question_id) REFERENCES questions(id)
+        )''')
+        self.cursor.execute('''CREATE TABLE IF NOT EXISTS user_performance(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            topic_id INTEGER,
+            numberQsAttempted INTEGER DEFAULT 0,
+            numberQsCorrect INTEGER DEFAULT 0,
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (topic_id) REFERENCES topics(id)
+        )''')
         self.conn.commit()
     def add_user(self, username, password):
         if username == "" or password == "":
-            self.controller.display_null(signUp)
+            self.error=tk.Label(self.controller.frames[signUp], text="Username or Password cannot be empty", font=("Helvetica", 14), bg=white_color, fg=error_color)
+            self.error.grid(row=9, column=4, sticky='ew')
+
             return False  # Indicate that the user was not added due to empty fields
+        if len(username) < 3 or len(username)>30:
+            self.error=tk.Label(self.controller.frames[signUp],text='Username must be between 3 and 30 characters',font=("Helvetica",14),bg=white_color,fg=error_color)
+            self.error.grid(row=9, column=4,sticky='ew')
+            return False
+        if len(password) < 6 :
+            self.error=tk.Label(self.controller.frames[signUp],text='Password must be at least 6 characters',font=("Helvetica",14),bg=white_color,fg=error_color)
+            self.error.grid(row=9, column=4, sticky='ew')
+            return False
+
+        if self.cursor.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone():
+            self.error=tk.Label(self.controller.frames[signUp], text="Username already exists", font=("Helvetica", 14), bg=white_color, fg=error_color)
+            self.error.grid(row=9, column=4, sticky='ew')
+            return False
         self.cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, password))
         self.conn.commit()
         return True
+    def validate_login(self, username, password):
+            self.cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, password))
+            user = self.cursor.fetchone()
+            if user:
+                self.controller.current_user=user[0]
+                return True
+            else:
+                self.error=tk.Label(self.controller.frames[Login], text="Invalid username or password", font=("Helvetica", 14), bg=white_color, fg=error_color)
+                self.error.grid(row=9, column=0, sticky='nsew',columnspan=10)
+                return False
+    def add_question(self, question_text, choice1, choice2, choice3, correct_choice, topic, user_id):
 
+        if not all([question_text, choice1, choice2, choice3, correct_choice]) or topic == "Select a Topic":
+            self.error=tk.Label(self.main_content,text="Please fill in all fields and select a topic.",fg=error_color,bg=white_color,font=("Helvetica",12))
+            self.error.grid(row=10,column=0,columnspan=9,sticky='nsew')
+            return False
+        if len(set([choice1, choice2, choice3, correct_choice])) < 4:
+            self.error=tk.Label(self.main_content,text="All answer choices must be unique.",fg=error_color,bg=white_color,font=("Helvetica",12))
+            self.error.grid(row=10,column=0,columnspan=9,sticky='nsew')
+            return False
+        self.cursor.execute("SELECT id FROM topics WHERE topic_name = ?", (topic,))
+        self.topic_id = self.cursor.fetchone()[0]
+        self.cursor.execute('''INSERT INTO questions (question_text, choice1, choice2, choice3, correct_choice, topic_id, user_id)
+                               VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                            (question_text, choice1, choice2, choice3, correct_choice, self.topic_id, user_id))
+        self.conn.commit()
+        return True
+    def get_user_performance(self, user_id):
+        self.cursor.execute('''SELECT topics.topic_name, user_performance.numberQsAttempted, user_performance.numberQsCorrect,topics.total_questions
+                               FROM user_performance
+                               JOIN topics ON user_performance.topic_id = topics.id
+                               WHERE user_performance.user_id = ?''', (user_id,))
+        return self.cursor.fetchall()
+    def get_username(self, user_id):
+        self.cursor.execute("SELECT username FROM users WHERE id = ?", (user_id,))
+        result = self.cursor.fetchone()
+        if result:
+            return result[0]
+        return None
+    def get_question_by_id(self, question_id):
+        self.cursor.execute('''SELECT question_text, choice1, choice2, choice3, correct_choice, topic_id 
+                            FROM questions 
+                            WHERE id = ?''', (question_id,))
+        return self.cursor.fetchone()
+            
+            
 class root(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -168,7 +269,7 @@ class Login(tk.Frame):
         self.login_button = tk.Button(self.main_content, text="Login", 
                                       font=("Helvetica", 14),
                                       fg=text_color, bg=accent_color, 
-                                      relief='raised',command=lambda: self.controller.show_frame(Dashboard))
+                                      relief='raised',command=lambda: self.login())
         self.login_button.grid(row=5, column=4, ipadx=10)
 
         self.signup_button = tk.Button(self.main_content, text="Sign Up", 
@@ -177,7 +278,15 @@ class Login(tk.Frame):
                                       relief='raised',command=lambda: self.controller.show_frame(signUp))
         self.signup_button.grid(row=6, column=4)
 
-        
+    def login(self):
+        username = self.username_entry.get()
+        password = self.password_entry.get()
+        if self.database.validate_login(username, password):
+            self.controller.show_frame(Dashboard)
+            self.username_entry.delete(0, tk.END)
+            self.password_entry.delete(0, tk.END)
+        else:
+            pass
 
 
 class Dashboard(tk.Frame):
@@ -227,10 +336,9 @@ class Dashboard(tk.Frame):
 
 
     def create_widgets(self):
+        
         self.title_label = tk.Label(self.header, text="Dashboard", font=("Helvetica", 24), bg=main_color, fg=white_color)
         self.title_label.grid(row=0, column=5, sticky='nsew')
-        self.message_label = tk.Label(self.header, text="Welcome , Lewis", font=("Helvetica", 14), bg=main_color, fg=white_color)
-        self.message_label.grid(row=1, column=5, sticky='nsew')
         self.sidebar_button=tk.Button(self.header, text="☰", font=("Helvetica", 14), bg=main_color,
                                        fg=white_color, relief='flat',command= lambda: self.controller.toggle_sidebar())
         self.sidebar_button.grid(row=0,column=0,columnspan=1,rowspan=2,sticky='nsew')
@@ -269,17 +377,49 @@ class Dashboard(tk.Frame):
         self.quizzescompleted_value = tk.Label(self.topics, text="0", font=("Helvetica", 14), bg=white_color, fg=text_color)
         self.quizzescompleted_value.grid(row=1, column=6, sticky='w', padx=(10,0))
 
-        self.progressbar=ttk.Progressbar(self.progress,orient='horizontal',length=300,mode='determinate')
-        self.progressbar.step(60)
-        self.progressbar.grid(row=3,column=0)
-
+        #creates the progress bars and adds them to a list for easy access 
+        self.progressbars=[]
         for i in range(9):
             progressbar=ttk.Progressbar(self.progress,orient='horizontal',length=300,mode='determinate')
-            progressbar.step(self.get_progress())
             if i != 1 and i % 2 !=0:
                 progressbar.grid(row=i,column=0)
+                self.progressbars.append(progressbar)
+    # updates the progress bars based on the user's performance in the database
+    def update_progressbars(self):
+        self.topics=self.get_progress()
+        for i in range(3):
+            try:
+                self.topic1_label.config(text=f"{self.topics[0].topic}: {self.topics[0].topic_completion}%")
+                self.topic2_label.config(text=f"{self.topics[1].topic}: {self.topics[1].topic_completion}%")
+                self.topic3_label.config(text=f"{self.topics[2].topic}: {self.topics[2].topic_completion}%")
+                self.progressbars[i].step(self.topics[i].topic_completion)
+            except IndexError:
+                pass
+    # updates the dashboard with the user's username 
+    def update_dashboard(self):
+        self.username=self.database.get_username(self.controller.current_user)
+        print(self.username)
+        self.message_label = tk.Label(self.header, text=f"Welcome , {self.username.title()}", font=("Helvetica", 14), bg=main_color, fg=white_color)
+        self.message_label.grid(row=1, column=5, sticky='nsew')
+    #gets the user's progress from the database, turns each record into an object and returns a list of objects sorted by completion percentage
     def get_progress(self):
-        return r.randint(0,100)
+        topics = []
+        self.performance = self.database.get_user_performance(self.controller.current_user)
+
+        for i in self.performance:
+            topic_name, numberQsAttempted, numberQsCorrect, total_questions = i
+            if total_questions > 0:
+                topic_completion = (numberQsAttempted / total_questions) * 100
+            else:
+                topic_completion = 0
+            topic= uprogress(topic=topic_name,
+                             numberQsAttempted=numberQsAttempted,
+                             numberQsCorrect=numberQsCorrect,
+                             total_questions=total_questions,topic_completion=topic_completion)
+            topics.append(topic)
+            #Sorts the topics based on completion percentage in descending order
+        topics.sort(key=lambda x: x.topic_completion, reverse=True)
+        return topics[:3]
 
         
 class Quiz(tk.Frame):
@@ -289,7 +429,7 @@ class Quiz(tk.Frame):
         self.database = database
         self.quiz_state= True
         self.questionanswered=0
-        self.questionqueue=[0,1,2,3,4]
+        self.questionqueue=[2,3,4,5,6]
         self.currentquestionindex=0
         self.responses=['x','x','x','x','x']
         self.create_layout()
@@ -382,7 +522,7 @@ class Quiz(tk.Frame):
                 print(self.responses)
                 self.nextQuestion()
             else:
-                self.SubmitError=tk.Label(self.stats, text="No Response selected", font=("Helvetica", 18,'bold'), bg=white_color, fg="#DB0000")
+                self.SubmitError=tk.Label(self.stats, text="No Response selected", font=("Helvetica", 18,'bold'), bg=white_color, fg=error_color)
                 self.SubmitError.grid(row=0,column=4,sticky='ew')
         else:
             self.quiz_state=False
@@ -416,7 +556,7 @@ class Quiz(tk.Frame):
     def display_question(self,questionnum):
             self.question_number_label.config(text=f'Question {self.currentquestionindex}')
             self.questions_remaining_label.config(text=f'Questions Remaining: {self.questionsremaining()}')
-            question=self.loadQuestion(questionnum)
+            question=self.loadQuestion(self.questionqueue[self.currentquestionindex])
             self.question_text.config(text=question.text)
             options=[question.distractor1,question.distractor2,question.distractor3,question.correct]
             #r.shuffle(options)
@@ -427,8 +567,10 @@ class Quiz(tk.Frame):
 
 
 
-    def loadQuestion(self,questionnum): # This will interact with the database in the real project, seperating database code from program logic
-        questiondata=minidb[questionnum]
+    def loadQuestion(self,questionnum): 
+        #in the real project, there will be a method to select the questions using the weighted algorithm, 
+        # and these ids will be passed in 
+        questiondata=self.database.get_question_by_id(questionnum)
         text,opt1,opt2,opt3,correct,topic=questiondata
         question=Question(text=text,
                             distractor1=opt1,
@@ -578,6 +720,7 @@ class Create(tk.Frame):
         self.create_subframes()
         self.create_widgets()
 
+
     def create_layout(self):
         self.grid_rowconfigure((0,1,2,3,4,5,6,7,8,9),weight=1)
         self.grid_columnconfigure((0,1,2,3,4,5,6,7,8,9),weight=1)
@@ -627,11 +770,36 @@ class Create(tk.Frame):
         self.topic=tk.OptionMenu(self.main_content,self.value,*self.optionlist)
 
         # Change to actual function later
-        self.submit_button=tk.Button(self.main_content,text="Create Question",bg=main_color,fg=white_color,relief='raised',command=print("Question Created "))
+        self.submit_button=tk.Button(self.main_content,text="Create Question",bg=main_color,fg=white_color,relief='raised',command=self.create_question)
         self.submit_button.grid(row=3, column=6,sticky='ew')
         self.topic.grid(row=1 ,column= 6,sticky='ew')
         self.sidebar_button = tk.Button(self.header, text="☰", font=("Helvetica", 14), bg=main_color, fg=white_color, relief='flat', command=self.controller.toggle_sidebar)
         self.sidebar_button.grid(row=0, column=0, sticky='w', padx=(10,0))
+    def create_question(self):
+        question_text = self.question_text.get()
+        distractor1 = self.distractor1.get()
+        distractor2 = self.distractor2.get()
+        distractor3 = self.distractor3.get()
+        correct_answer = self.correct_answer.get()
+        topic = self.value.get()
+        try:
+            self.database.error.grid_forget()
+        except:
+            pass
+
+        
+        if self.database.add_question(question_text=question_text, 
+                                   choice1=distractor1,
+                                   choice2=distractor2, 
+                                   choice3=distractor3, 
+                                   correct_choice=correct_answer, 
+                                   topic=topic,
+                                   user_id=self.controller.current_user):
+            
+            self.message=tk.Label(self.main_content,text="Question Created Successfully!",fg=main_color,bg=white_color,font=("Helvetica",16))
+            self.message.grid(row=8,column=0,columnspan=9,sticky='nsew')
+        else:
+            pass
 class signUp(tk.Frame):
     def __init__(self,parent,controller,database):
         super().__init__(parent,bg=white_color)
@@ -678,16 +846,18 @@ class signUp(tk.Frame):
     def create_account(self):
         username = self.username_entry.get()
         password = self.password_entry.get()
-        if not self.database.add_user(username, password):
-            pass
-        else:
+        if self.database.add_user(username, password):
             self.controller.show_frame(Login)
             self.username_entry.delete(0, tk.END)
             self.password_entry.delete(0, tk.END)
             try:
                 self.controller.error.grid_forget()
+                self.database.error.grid_forget()
             except:
                 pass
+        else:
+            pass
+
 if __name__ == "__main__":
     app = root()
     controller = controller(app)
