@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import random as r 
+import database as db 
 minidb=[["QUESTION 1","a","b","c",'d',"TOPIC A"],
                             ["Q2","1","2","3","4","TOPIC B"],
                             ["Q3","MAR","VAR","PAR","RAM","TOPIC C"],
@@ -38,4 +39,13 @@ class test():
                             correct=correct,
                             topic=topic)
         return question
-x=test()
+
+def generate_question_queue():
+    # Fetch available question IDs from the database
+    available_ids = db.database.get_question_ids(db.database(),current_user_id=1)  # Replace with the actual user ID
+    question_count = r.randint(1,len(available_ids))  # Randomly choose a number of questions to select
+    return r.sample(available_ids, question_count)
+
+
+    test_instance= test()
+generate_question_queue()

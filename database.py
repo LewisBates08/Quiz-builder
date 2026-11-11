@@ -120,4 +120,10 @@ class database():
                             WHERE id = ?''', (question_id,))
         return self.cursor.fetchone()
             
-            
+    def get_question_ids(self,current_user_id):
+        self.cursor.execute("SELECT id FROM questions WHERE user_id IS NULL OR user_id = ?", (current_user_id,))
+        ids=[]
+        for i in self.cursor.fetchall():
+            ids.append(i[0])
+        return ids
+             

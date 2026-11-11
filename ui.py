@@ -5,7 +5,7 @@ import random as r
 from dataclasses import dataclass
 import logic 
 import database as db
-from click import progressbar
+
 
 main_color = "#2570C0"
 accent_color = "#7FD0FB"
@@ -13,6 +13,8 @@ white_color = "#FFFFFF"
 text_color = "#000000"
 text_color2 = "#8317EE"
 error_color = "#DB0000"
+correct_color = "#00FF00"
+incorrect_color = "#FF0000"
 minidb=[["QUESTION 1","a","b","c",'d',"TOPIC A"],
                             ["Q2","1","2","3","4","TOPIC B"],
                             ["Q3","MAR","VAR","PAR","RAM","TOPIC C"],
@@ -56,7 +58,7 @@ class controller():
         self.show_frame(Login) # show the login frame first
         self.sidebar_visible = False
         self.quizresults= {'score':0,
-                           'responses':None,
+                           'responses':0,
                            'questions':None}
     def toggle_sidebar(self):
         if self.sidebar_visible:
@@ -264,7 +266,6 @@ class Dashboard(tk.Frame):
         self.quizzescompleted_label.grid(row=0, column=6, sticky='w', padx=(10,0))
         self.quizzescompleted_value = tk.Label(self.topics, text="0", font=("Helvetica", 14), bg=white_color, fg=text_color)
         self.quizzescompleted_value.grid(row=1, column=6, sticky='w', padx=(10,0))
-
         #creates the progress bars and adds them to a list for easy access 
         self.progressbars=[]
         for i in range(9):
@@ -318,12 +319,8 @@ class Quiz(tk.Frame):
         self.database=db.database()
         self.questionanswered=0
         self.questionqueue=[]
-        for i in range (r.randint(0,20)):
-            qnum=r.randint(1,20)
-            if qnum in self.questionqueue:
-                pass
-            else:
-                self.questionqueue.append(qnum)
+        self.generate_question_queue()
+        print(self.questionqueue)
         self.currentquestionindex=0
         self.responses=[]
         
@@ -357,6 +354,11 @@ class Quiz(tk.Frame):
         self.stats.grid_rowconfigure((0,1,2,3,4), weight=1)
         self.stats.grid_columnconfigure((0,1,2,3,4,5,6,7,8,9), weight=1)
 
+    def generate_question_queue(self):
+        # Fetch available question IDs from the database
+        available_ids = self.database.get_question_ids(self.controller.current_user)
+        question_count = r.randint(1,len(available_ids))  # Randomly choose a number of questions to select
+        self.questionqueue.extend(r.sample(available_ids, question_count))
     def questionsremaining(self):
         return (len(self.questionqueue)-self.currentquestionindex)
     def create_widgets(self):
@@ -438,7 +440,7 @@ class Quiz(tk.Frame):
                 self.controller.quizresults['score']=self.markQuiz()
                 self.controller.quizresults['responses']=self.responses
                 self.controller.quizresults['questions']=self.questionqueue
-
+                self.controller.frames[Review].update_review()
                 self.controller.show_frame(Review)
         else:
             self.display_error()
@@ -472,7 +474,7 @@ class Quiz(tk.Frame):
     def resetQuiz(self):
         self.currentquestionindex=0
         self.questionanswered=0
-        
+
 
 
     def display_error(self):
@@ -486,6 +488,7 @@ class Quiz(tk.Frame):
         # Set the background color of the selected option
         selected_option.config(bg=accent_color)
     def reset_indicators(self):
+        # Reset the background color of all options to white
         for option in [self.option1, self.option2, self.option3, self.option4]:
             option.config(bg=white_color)
     def quitQuiz(self):
@@ -506,12 +509,14 @@ class Quiz(tk.Frame):
             self.option3.config(text=options[2],value=options[2])
             self.option4.config(text=options[3],value=options[3])
         else:
-            print(questionnum)
+            pass
 class Review(tk.Frame):
     def __init__(self,parent,controller,database):
         super().__init__(parent)
         self.controller = controller
         self.database = database
+        self.currentquestionindex=0
+
         self.create_layout()
         self.create_subframes()
         self.create_widgets()
@@ -547,7 +552,7 @@ class Review(tk.Frame):
         self.score_label.grid(row=0, column=0, sticky='w', padx=(10,0))
         self.previous_button = tk.Button(self.stats, text="Previous",font=("Helvetica", 14), bg=white_color,fg=text_color, relief='raised',width=10)
         self.previous_button.grid(row=0, column=9, sticky='e')
-        self.next_button = tk.Button(self.stats, text="Next",font=("Helvetica", 14), bg=white_color,fg=text_color, relief='raised',width=10)
+        self.next_button = tk.Button(self.stats, text="Next",font=("Helvetica", 14), bg=white_color,fg=text_color, relief='raised',width=10,command=self.next_question)
         self.next_button.grid(row=0, column=8, sticky='e')
         self.question_number_label = tk.Label(self.stats, text="Question 1", font=("Helvetica", 14),
                                                bg=white_color, fg=text_color)
@@ -573,11 +578,74 @@ class Review(tk.Frame):
                                  bg=white_color, fg=text_color)
         self.option3_label.grid(row=3, column=0, sticky='nsew', columnspan=9, padx=(10,0))
         self.option4_label = tk.Label(self.question, text="4.Wireless Access Point", font=("Helvetica", 14,'bold'),
-                                 bg=white_color, fg="#00FF00")
+                                 bg=white_color, fg=correct_color)
         self.option4_label.grid(row=4, column=0, sticky='nsew', padx=(10,0), columnspan=9)
 
         self.sidebar_button = tk.Button(self.header, text="☰", font=("Helvetica", 14), bg=main_color, fg=white_color, relief='flat', command=self.controller.toggle_sidebar)
         self.sidebar_button.grid(row=0, column=0, sticky='w', padx=(10,0))
+
+    def update_review(self):
+        self.score = self.controller.quizresults['score']
+        self.questions = self.controller.quizresults['questions']
+        self.responses = self.controller.quizresults['responses']
+        self.display_question(self.questions[self.currentquestionindex])
+        self.score_label.config(text=f"Score: {self.score}")
+        self.totalquestions_label.config(text=f"Questions: {len(self.questions)}")
+    def next_question(self):
+        if self.currentquestionindex < len(self.questions) - 1:
+            self.currentquestionindex += 1
+            self.display_question(self.questions[self.currentquestionindex])
+        else:
+            self.next_button.grid_forget()
+    def display_question(self,qnum):
+        #Loads user response for the specifc question
+        user_response=self.responses[self.currentquestionindex]
+        #Resets the text color of the option labels to default
+        self.option1_label.config(fg=text_color)
+        self.option2_label.config(fg=text_color)
+        self.option3_label.config(fg=text_color)
+        self.option4_label.config(fg=text_color)
+        #Loads the question object for the specific question number
+        question = self.loadQuestion(qnum)
+        #Checks if the user's response is correct and updates the status label accordingly
+        if question.correct == user_response:
+            self.status_label.config(text="Correct", fg=correct_color)
+        else:
+            self.status_label.config(text="Incorrect", fg=incorrect_color)
+        #Updates question label
+        self.question_label.config(text=question.text)
+        #Adds each option for the question object to a list and shuffles the list to randomize the order of the options
+        options = [question.distractor1, question.distractor2, question.distractor3, question.correct]
+        r.shuffle(options)
+        #Creates a dictionary that maps each option to its corresponding label widget
+        map={options[0]: self.option1_label, options[1]: self.option2_label, options[2]: self.option3_label, options[3]: self.option4_label}
+        self.option1_label.config(text=options[0])
+        self.option2_label.config(text=options[1])
+        self.option3_label.config(text=options[2])
+        self.option4_label.config(text=options[3])
+        #Updates the question number label and total questions label
+        self.question_number_label.config(text=f"Question {self.currentquestionindex + 1}")
+        self.totalquestions_label.config(text=f"Questions: {len(self.questions)}")
+        #Iterates through the options and updates the text color of the correct answer to green and the user's response to blue if it is incorrect
+        for i in range(len(options)):
+            if options[i] == question.correct:
+                map[options[i]].config( fg=correct_color)
+            if question.correct != user_response:
+                if options[i] == user_response:
+                    map[options[i]].config(fg=incorrect_color)
+                
+        
+    def loadQuestion(self, questionnum):
+            questiondata=self.database.get_question_by_id(questionnum)
+            text,opt1,opt2,opt3,correct,topic=questiondata
+            #creates a question object using question data
+            question=Question(text=text,
+                                distractor1=opt1,
+                                distractor2=opt2,
+                                distractor3=opt3,
+                                correct=correct,
+                                topic=topic)
+            return question 
     
 class sidebar(tk.Frame):
     def __init__(self, parent, controller):
