@@ -3,7 +3,6 @@ from tkinter import ttk
 from tkinter import messagebox
 import random as r
 from dataclasses import dataclass
-import logic 
 import database as db
 
 
@@ -319,8 +318,7 @@ class Quiz(tk.Frame):
         self.database=db.database()
         self.questionanswered=0
         self.questionqueue=[]
-        self.generate_question_queue()
-        print(self.questionqueue)
+        self.generate_questions()
         self.currentquestionindex=0
         self.responses=[]
         
@@ -407,12 +405,16 @@ class Quiz(tk.Frame):
         
         self.submit_button.grid(row=5,column=4,sticky='ew', padx=(10,0))
 
-
+    def generate_questions(self):
+        #Fetches the question ids from the database and randomly selects a number of questions to be used in the quiz
+        available_questions = self.database.get_question_ids(self.controller.current_user)
+        count= r.randint(3,len(available_questions))
+        self.questionqueue = r.sample(available_questions, count)
+        print(f"Generated question queue: {self.questionqueue}")  # Debugging statement
 #Saves the response to be marked later, increments the counters, and displays the next question
     def submit_answer(self):
-        selected_answer = self.answer.get()
+        selected_answer = self.answer.get()#Gets the value of the selected answer
         self.answer.set('')# Resets the variable which stores the response
-
         #Tries to remove any error messages
         try:
             self.SubmitError.grid_forget()
@@ -420,12 +422,11 @@ class Quiz(tk.Frame):
             pass
         #Checks that an answer has been selected
         if selected_answer:
-            #Checks if the quiz has reached the last question 
+            #Checks if the quiz has reached the last question , if not it stores the response and displays the next question
             if self.questionanswered< len(self.questionqueue) -1:
                 self.responses.append(selected_answer)
                 self.questionanswered+=1
                 self.currentquestionindex+=1
-                (self.responses)
                 self.reset_indicators()
                 self.question_number_label.config(text=f'Question {self.currentquestionindex}')
                 self.questions_remaining_label.config(text=f'Questions Remaining: {self.questionsremaining()}')
@@ -433,14 +434,13 @@ class Quiz(tk.Frame):
             else:
                 #If the quiz has reached the final question, 
                 # it stores the response for the final question and saves the quiz results 
-                # in the controller so it can be accessed by the review frame
-                ##REMOVE FOR NEA : use this line for error - Final question wouldn't submit,so added line here to make sure it was saved
+                # in the controller so it can be accessed by the review fram
                 self.responses.append(selected_answer)
-                self.resetQuiz()
                 self.controller.quizresults['score']=self.markQuiz()
-                self.controller.quizresults['responses']=self.responses
-                self.controller.quizresults['questions']=self.questionqueue
+                self.controller.quizresults['responses']=self.responses.copy()
+                self.controller.quizresults['questions']=self.questionqueue.copy()
                 self.controller.frames[Review].update_review()
+                self.resetQuiz()
                 self.controller.show_frame(Review)
         else:
             self.display_error()
@@ -472,9 +472,18 @@ class Quiz(tk.Frame):
         return question 
             
     def resetQuiz(self):
+        self.answer.set('')
         self.currentquestionindex=0
         self.questionanswered=0
-
+        self.responses=[]
+        self.questionqueue=[]
+        self.reset_indicators()
+        self.generate_questions()
+        self.display_question(self.questionqueue[self.currentquestionindex])
+        self.question_number_label.config(text='Question 0')
+        self.questions_remaining_label.config(
+            text=f'Questions Remaining: {self.questionsremaining()}'
+        )
 
 
     def display_error(self):
@@ -494,16 +503,19 @@ class Quiz(tk.Frame):
     def quitQuiz(self):
         self.controller.show_frame(Dashboard)
         self.resetQuiz()
-        self.display_question(self.questionqueue[self.currentquestionindex])
 
 
-    
+
+    # Recieves question number, fetches the question from the database and displays it in the quiz frame
     def display_question(self,questionnum):
         question=self.loadQuestion(questionnum)
+        #ensures that the question is not None before attempting to display it
         if question:
             self.question_text.config(text=question.text)
+            # ensures options are displayed in a random order
             options=[question.distractor1,question.distractor2,question.distractor3,question.correct]
             r.shuffle(options)
+            #alters the text and value of the radiobuttons to match the options for the current question
             self.option1.config(text=options[0],value=options[0])
             self.option2.config(text=options[1],value=options[1])
             self.option3.config(text=options[2],value=options[2])
@@ -633,8 +645,7 @@ class Review(tk.Frame):
             if question.correct != user_response:
                 if options[i] == user_response:
                     map[options[i]].config(fg=incorrect_color)
-                
-        
+
     def loadQuestion(self, questionnum):
             questiondata=self.database.get_question_by_id(questionnum)
             text,opt1,opt2,opt3,correct,topic=questiondata
@@ -646,7 +657,7 @@ class Review(tk.Frame):
                                 correct=correct,
                                 topic=topic)
             return question 
-    
+
 class sidebar(tk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent, bg="#2570C0")
