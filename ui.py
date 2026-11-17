@@ -532,6 +532,7 @@ class Review(tk.Frame):
         self.create_layout()
         self.create_subframes()
         self.create_widgets()
+        self.empty_review()
     def create_layout(self):
         self.grid_rowconfigure((0,1,2,3,4,5,6,7,8,9), weight=1)
         self.grid_columnconfigure((0,1,2,3,4,5,6,7,8,9), weight=1)
@@ -609,6 +610,22 @@ class Review(tk.Frame):
             self.display_question(self.questions[self.currentquestionindex])
         else:
             self.next_button.grid_forget()
+    def empty_review(self):
+        self.questiontext.config(text="No questions to review. Please take a quiz first.",fg=error_color)
+        self.option1_label.config(text="-")
+        self.option2_label.config(text="-")
+        self.option3_label.config(text="-")
+        self.option4_label.config(text="-")
+        self.status_label.config(text="--",fg=error_color)
+        self.question_number_label.config(text="-",fg=error_color)
+        self.totalquestions_label.config(text="-")
+    def previous_question(self):
+        if self.currentquestionindex > 0:
+            self.currentquestionindex -= 1
+            self.display_question(self.questions[self.currentquestionindex])
+        else:
+            self.previous_button.grid_forget()
+            
     def display_question(self,qnum):
         #Loads user response for the specifc question
         user_response=self.responses[self.currentquestionindex]
