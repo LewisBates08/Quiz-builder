@@ -174,6 +174,7 @@ class Login(tk.Frame):
             self.username_entry.delete(0, tk.END)
             self.password_entry.delete(0, tk.END)
             self.controller.current_user=userid
+            self.controller.frames[Dashboard].update_dashboard()
         else:
             self.controller.login_error(Login)
 
@@ -186,7 +187,6 @@ class Dashboard(tk.Frame):
         self.create_layout()
         self.create_subframes()
         self.create_widgets()
-
     def create_layout(self):
         self.grid_rowconfigure((0,1,2,3,4,5,6,7,8,9,10), weight=1)
         self.grid_columnconfigure((0,1,2,3,4,5,6,7,8,9,10), weight=1)
@@ -286,9 +286,9 @@ class Dashboard(tk.Frame):
     # updates the dashboard with the user's username 
     def update_dashboard(self):
         self.username=self.database.get_username(self.controller.current_user)
-        print(self.username)
-        self.message_label = tk.Label(self.header, text=f"Welcome , {self.username.title()}", font=("Helvetica", 14), bg=main_color, fg=white_color)
+        self.message_label = tk.Label(self.header, text=f"Welcome , {self.username}", font=("Helvetica", 14), bg=main_color, fg=white_color)
         self.message_label.grid(row=1, column=5, sticky='nsew')
+        self.update_progressbars()
     #gets the user's progress from the database, turns each record into an object and returns a list of objects sorted by completion percentage
     def get_progress(self):
         topics = []
@@ -352,11 +352,6 @@ class Quiz(tk.Frame):
         self.stats.grid_rowconfigure((0,1,2,3,4), weight=1)
         self.stats.grid_columnconfigure((0,1,2,3,4,5,6,7,8,9), weight=1)
 
-    def generate_question_queue(self):
-        # Fetch available question IDs from the database
-        available_ids = self.database.get_question_ids(self.controller.current_user)
-        question_count = r.randint(1,len(available_ids))  # Randomly choose a number of questions to select
-        self.questionqueue.extend(r.sample(available_ids, question_count))
     def questionsremaining(self):
         return (len(self.questionqueue)-self.currentquestionindex)
     def create_widgets(self):
@@ -408,7 +403,7 @@ class Quiz(tk.Frame):
     def generate_questions(self):
         #Fetches the question ids from the database and randomly selects a number of questions to be used in the quiz
         available_questions = self.database.get_question_ids(self.controller.current_user)
-        count= r.randint(3,len(available_questions))
+        count= r.randint(3,5)
         self.questionqueue = r.sample(available_questions, count)
         print(f"Generated question queue: {self.questionqueue}")  # Debugging statement
 #Saves the response to be marked later, increments the counters, and displays the next question
@@ -439,6 +434,7 @@ class Quiz(tk.Frame):
                 self.controller.quizresults['score']=self.markQuiz()
                 self.controller.quizresults['responses']=self.responses.copy()
                 self.controller.quizresults['questions']=self.questionqueue.copy()
+                self.controller.frames[Review].reset_review()
                 self.controller.frames[Review].update_review()
                 self.resetQuiz()
                 self.controller.show_frame(Review)
@@ -450,7 +446,13 @@ class Quiz(tk.Frame):
             question=self.loadQuestion(self.questionqueue[i])
             if self.responses[i]== question.correct:
                 score+=1
-
+                self.database.update_user_performance(user_id=self.controller.current_user,
+                                                      topic_id=question.topic,
+                                                      is_correct=True)
+            else:
+                self.database.update_user_performance(user_id=self.controller.current_user,
+                                                      topic_id=question.topic,
+                                                      is_correct=False)
         return score 
     def questionsremaining(self):
         return len(self.questionqueue)-self.questionanswered
@@ -469,6 +471,7 @@ class Quiz(tk.Frame):
                             distractor3=opt3,
                             correct=correct,
                             topic=topic)
+        print('topic_id:',question.topic)
         return question 
             
     def resetQuiz(self):
@@ -484,6 +487,7 @@ class Quiz(tk.Frame):
         self.questions_remaining_label.config(
             text=f'Questions Remaining: {self.questionsremaining()}'
         )
+        
 
 
     def display_error(self):
@@ -563,7 +567,7 @@ class Review(tk.Frame):
         self.score_label = tk.Label(self.stats, text="Score: 8", font=("Helvetica", 14,"bold"), 
                                     bg=white_color, fg=text_color)
         self.score_label.grid(row=0, column=0, sticky='w', padx=(10,0))
-        self.previous_button = tk.Button(self.stats, text="Previous",font=("Helvetica", 14), bg=white_color,fg=text_color, relief='raised',width=10)
+        self.previous_button = tk.Button(self.stats, text="Previous",font=("Helvetica", 14), bg=white_color,fg=text_color, relief='raised',width=10,command=self.previous_question)
         self.previous_button.grid(row=0, column=9, sticky='e')
         self.next_button = tk.Button(self.stats, text="Next",font=("Helvetica", 14), bg=white_color,fg=text_color, relief='raised',width=10,command=self.next_question)
         self.next_button.grid(row=0, column=8, sticky='e')
@@ -591,27 +595,43 @@ class Review(tk.Frame):
                                  bg=white_color, fg=text_color)
         self.option3_label.grid(row=3, column=0, sticky='nsew', columnspan=9, padx=(10,0))
         self.option4_label = tk.Label(self.question, text="4.Wireless Access Point", font=("Helvetica", 14,'bold'),
-                                 bg=white_color, fg=correct_color)
+                                 bg=white_color, fg=text_color)
         self.option4_label.grid(row=4, column=0, sticky='nsew', padx=(10,0), columnspan=9)
 
         self.sidebar_button = tk.Button(self.header, text="☰", font=("Helvetica", 14), bg=main_color, fg=white_color, relief='flat', command=self.controller.toggle_sidebar)
         self.sidebar_button.grid(row=0, column=0, sticky='w', padx=(10,0))
 
+    def reset_review(self):
+        self.currentquestionindex=0
+        self.score=0
+        self.questions=[]
+        self.responses=[]
+        try:
+            self.next_button.grid(row=0, column=8, sticky='e')
+        except:
+            pass
+        try:
+            self.previous_button.grid(row=0, column=9, sticky='e')
+        except:
+            pass
+        self.empty_review()
     def update_review(self):
+
         self.score = self.controller.quizresults['score']
         self.questions = self.controller.quizresults['questions']
         self.responses = self.controller.quizresults['responses']
         self.display_question(self.questions[self.currentquestionindex])
+        self.question_label.config(fg=text_color)
         self.score_label.config(text=f"Score: {self.score}")
-        self.totalquestions_label.config(text=f"Questions: {len(self.questions)}")
+        self.totalquestions_label.config(text=f"Questions: {len(self.questions)}",fg=text_color)
+        self.question_number_label.config(fg=text_color)
+        print(f"Current question index: {self.currentquestionindex}, score: {self.score}, questions: {self.questions}, responses: {self.responses}") 
     def next_question(self):
         if self.currentquestionindex < len(self.questions) - 1:
             self.currentquestionindex += 1
             self.display_question(self.questions[self.currentquestionindex])
-        else:
-            self.next_button.grid_forget()
     def empty_review(self):
-        self.questiontext.config(text="No questions to review. Please take a quiz first.",fg=error_color)
+        self.question_label.config(text="No questions to review. Please take a quiz first.",fg=error_color)
         self.option1_label.config(text="-")
         self.option2_label.config(text="-")
         self.option3_label.config(text="-")
@@ -623,10 +643,17 @@ class Review(tk.Frame):
         if self.currentquestionindex > 0:
             self.currentquestionindex -= 1
             self.display_question(self.questions[self.currentquestionindex])
-        else:
-            self.previous_button.grid_forget()
             
     def display_question(self,qnum):
+
+        if self.currentquestionindex == 0:
+            self.previous_button.grid_forget()
+        else:
+            self.previous_button.grid(row=0, column=9, sticky='e')
+        if self.currentquestionindex == len(self.questions) - 1:
+            self.next_button.grid_forget()
+        else:
+            self.next_button.grid(row=0, column=8, sticky='e')
         #Loads user response for the specifc question
         user_response=self.responses[self.currentquestionindex]
         #Resets the text color of the option labels to default

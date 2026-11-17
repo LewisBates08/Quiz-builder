@@ -109,11 +109,11 @@ class database():
                                WHERE user_performance.user_id = ?''', (user_id,))
         return self.cursor.fetchall()
     def get_username(self, user_id):
+        print(f"Fetching username for user_id: {user_id}")  # Debugging statement
         self.cursor.execute("SELECT username FROM users WHERE id = ?", (user_id,))
         result = self.cursor.fetchone()
         if result:
             return result[0]
-        return None
     def get_question_by_id(self, question_id):
         self.cursor.execute('''SELECT question_text, choice1, choice2, choice3, correct_choice, topic_id 
                             FROM questions 
@@ -126,4 +126,33 @@ class database():
         for i in self.cursor.fetchall():
             ids.append(i[0])
         return ids
-             
+    def update_user_performance(self, user_id, topic_id, is_correct):
+        #checks if the user already has a record this topic 
+        self.cursor.execute('''SELECT numberQsAttempted, numberQsCorrect 
+                               FROM user_performance 
+                               WHERE user_id = ? AND topic_id = ?''', (user_id, topic_id))
+        result = self.cursor.fetchone()
+        #if the user already has a record for this topic, we increment the number of questions
+        #if the question was answered correctly, we also increment the number of correct questions
+        if result:
+            numberQsAttempted, numberQsCorrect = result
+            numberQsAttempted += 1
+            if is_correct:
+                numberQsCorrect += 1
+        #update the record in the database with the new values
+            self.cursor.execute('''UPDATE user_performance 
+                                   SET numberQsAttempted = ?, numberQsCorrect = ? 
+                                   WHERE user_id = ? AND topic_id = ?''', 
+                                   (numberQsAttempted, numberQsCorrect, user_id, topic_id))
+        # if the user does not have a record for this topic, we create a new record with the initial values
+        else:
+            numberQsAttempted = 1
+            if is_correct:
+                numberQsCorrect = 1
+            else:
+                numberQsCorrect=0
+            
+            self.cursor.execute('''INSERT INTO user_performance (user_id, topic_id, numberQsAttempted, numberQsCorrect) 
+                                VALUES (?, ?, ?, ?)''', 
+                                (user_id, topic_id, numberQsAttempted, numberQsCorrect))
+        self.conn.commit()
