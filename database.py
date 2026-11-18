@@ -109,7 +109,6 @@ class database():
                                WHERE user_performance.user_id = ?''', (user_id,))
         return self.cursor.fetchall()
     def get_username(self, user_id):
-        print(f"Fetching username for user_id: {user_id}")  # Debugging statement
         self.cursor.execute("SELECT username FROM users WHERE id = ?", (user_id,))
         result = self.cursor.fetchone()
         if result:
@@ -155,4 +154,27 @@ class database():
             self.cursor.execute('''INSERT INTO user_performance (user_id, topic_id, numberQsAttempted, numberQsCorrect) 
                                 VALUES (?, ?, ?, ?)''', 
                                 (user_id, topic_id, numberQsAttempted, numberQsCorrect))
+
+    def update_quizzes(self,user_id,score):
+        
+        self.cursor.execute('''INSERT INTO quizzes (user_id,accuracy) VALUES (?,?)''', 
+                            (user_id,score))
         self.conn.commit()
+
+    def get_quiz_count(self,user_id):
+        self.cursor.execute('''SELECT accuracy FROM quizzes WHERE user_id = ?''',(user_id,))
+        quizzes=self.cursor.fetchall()
+        return len(quizzes)
+    def get_average_accuracy(self,user_id):
+        self.cursor.execute('''SELECT AVG(score) FROM quizzes WHERE user_id = ?''',(user_id,))
+        return self.cursor.fetchone()[0]
+    def get_question_count(self,user_id):
+        self.cursor.execute('''SELECT question_id FROM user_questions WHERE user_id = ?''',(user_id,))
+        return len(self.cursor.fetchall())
+    def write_question(self,user_id,question_id,user_answer,is_correct):
+        self.cursor.execute('''INSERT INTO user_questions (user_id,question_id,user_answer,is_correct) 
+                            VALUES (?,?,?,?)''',
+                            (user_id,question_id,user_answer,is_correct))
+    def get_topic_count(self,user_id):
+        self.cursor.execute('''SELECT topic_id FROM user_performance WHERE user_id = ?''',(user_id,))
+        return len(self.cursor.fetchall())

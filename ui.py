@@ -286,9 +286,14 @@ class Dashboard(tk.Frame):
     # updates the dashboard with the user's username 
     def update_dashboard(self):
         self.username=self.database.get_username(self.controller.current_user)
+        
         self.message_label = tk.Label(self.header, text=f"Welcome , {self.username}", font=("Helvetica", 14), bg=main_color, fg=white_color)
         self.message_label.grid(row=1, column=5, sticky='nsew')
         self.update_progressbars()
+
+        self.quizzescompleted_value.config(text=self.database.get_quiz_count(self.controller.current_user))
+        self.questionsanswered_value.config(text= self.database.get_question_count(self.controller.current_user))
+        self.topic_value.config(text=self.database.get_topic_count(self.controller.current_user))
     #gets the user's progress from the database, turns each record into an object and returns a list of objects sorted by completion percentage
     def get_progress(self):
         topics = []
@@ -444,6 +449,10 @@ class Quiz(tk.Frame):
         score=0
         for i in range(len(self.questionqueue)):
             question=self.loadQuestion(self.questionqueue[i])
+            self.database.write_question(user_id=self.controller.current_user,
+                                         question_id=self.questionqueue[i],
+                                         user_answer=self.responses[i],
+                                         is_correct=self.responses[i]==question.correct)
             if self.responses[i]== question.correct:
                 score+=1
                 self.database.update_user_performance(user_id=self.controller.current_user,
@@ -453,6 +462,9 @@ class Quiz(tk.Frame):
                 self.database.update_user_performance(user_id=self.controller.current_user,
                                                       topic_id=question.topic,
                                                       is_correct=False)
+        percentage_accuracy=score / len(self.questionqueue)
+        print(percentage_accuracy)
+        self.database.update_quizzes(self.controller.current_user,score=percentage_accuracy)
         return score 
     def questionsremaining(self):
         return len(self.questionqueue)-self.questionanswered
@@ -741,7 +753,7 @@ class sidebar(tk.Frame):
         bg=white_color,fg=main_color,
         command=lambda:self.controller.show_frame(Create))
         self.create.grid(row=10,column=0,sticky='ew')
-
+    
         
 
 
