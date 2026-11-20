@@ -277,43 +277,66 @@ class Dashboard(tk.Frame):
         self.topics=self.get_progress()
         for i in range(3):
             try:
-                self.topic1_label.config(text=f"{self.topics[0].topic}: {self.topics[0].topic_completion}%")
-                self.topic2_label.config(text=f"{self.topics[1].topic}: {self.topics[1].topic_completion}%")
-                self.topic3_label.config(text=f"{self.topics[2].topic}: {self.topics[2].topic_completion}%")
-                self.progressbars[i].step(self.topics[i].topic_completion)
+                self.topic1_label.config(text=f"{self.topics[i].topic}: {self.topics[i].topic_completion}%")
+                self.progressbars[i]['value']=(self.topics[i].topic_completion)
             except IndexError:
                 pass
     # updates the dashboard with the user's username 
     def update_dashboard(self):
         self.username=self.database.get_username(self.controller.current_user)
-        
+        #Updates the header to display the username
         self.message_label = tk.Label(self.header, text=f"Welcome , {self.username}", font=("Helvetica", 14), bg=main_color, fg=white_color)
         self.message_label.grid(row=1, column=5, sticky='nsew')
         self.update_progressbars()
-
+        #Updates the number of quizzes completed,questions answered and topics covered
         self.quizzescompleted_value.config(text=self.database.get_quiz_count(self.controller.current_user))
         self.questionsanswered_value.config(text= self.database.get_question_count(self.controller.current_user))
         self.topic_value.config(text=self.database.get_topic_count(self.controller.current_user))
+        #Updates the best/worst topic statistics
+        best,worst=self.get_bestworst_topics()
+        self.besttopic_value.config(text=(best))
+        self.worsttopic_value.config(text=worst)
     #gets the user's progress from the database, turns each record into an object and returns a list of objects sorted by completion percentage
     def get_progress(self):
+        # Store the topic objects used to update the dashboard
         topics = []
+        # Retrieve performance records for the currently logged-in user
         self.performance = self.database.get_user_performance(self.controller.current_user)
-
+        # Print the retrieved records for debugging
+        print(self.performance)
         for i in self.performance:
-            topic_name, numberQsAttempted, numberQsCorrect, total_questions = i
+            # Unpack the topic name, attempt count, correct count and question total
+            topic_name,numberQsAttempted,numberQsCorrect,total_questions,= i
+
+            # Calculate completion only when the topic contains questions
             if total_questions > 0:
                 topic_completion = (numberQsAttempted / total_questions) * 100
+                # Cap completion at 100% because repeated attempts can raise the count
+                if topic_completion>100:
+                    topic_completion=100
             else:
+                # Avoid division by zero for topics with no questions
                 topic_completion = 0
+            # Keep each topic's statistics together in a uprogress object
             topic= uprogress(topic=topic_name,
-                             numberQsAttempted=numberQsAttempted,
-                             numberQsCorrect=numberQsCorrect,
-                             total_questions=total_questions,topic_completion=topic_completion)
+            numberQsAttempted=numberQsAttempted,
+            numberQsCorrect=numberQsCorrect,
+            total_questions=total_questions,topic_completion=topic_completion)
+            # Add this topic to the list before sorting
             topics.append(topic)
             #Sorts the topics based on completion percentage in descending order
         topics.sort(key=lambda x: x.topic_completion, reverse=True)
+        # Return up to three topics with the highest completion percentages
         return topics[:3]
-
+    def get_bestworst_topics(self):
+        topics=self.database.get_user_performance(self.controller.current_user)
+        accuracies={}
+        for i in topics:
+            accuracy=i[2] / i[1]
+            accuracies[i[0]]=accuracy
+        besttopic= max(accuracies, key=accuracies.get)
+        worsttopic=min(accuracies, key= accuracies.get)
+        return(besttopic,worsttopic)
         
 class Quiz(tk.Frame):
     def __init__(self,parent,controller,database):
@@ -463,7 +486,6 @@ class Quiz(tk.Frame):
                                                       topic_id=question.topic,
                                                       is_correct=False)
         percentage_accuracy=score / len(self.questionqueue)
-        print(percentage_accuracy)
         self.database.update_quizzes(self.controller.current_user,score=percentage_accuracy)
         return score 
     def questionsremaining(self):
@@ -733,7 +755,7 @@ class sidebar(tk.Frame):
         
         self.dashboard = tk.Button(
             self, text="Dashboard",bg=white_color,fg=main_color,
-            command=lambda: self.controller.show_frame(Dashboard)
+            command=lambda: self.dashboard
         )
         self.dashboard.grid(row=4, column=0, sticky="ew")
 
@@ -754,7 +776,11 @@ class sidebar(tk.Frame):
         command=lambda:self.controller.show_frame(Create))
         self.create.grid(row=10,column=0,sticky='ew')
     
-        
+    def dashboard(self):
+        self.controller.frames[Dashboard].update_dashboard()
+        self.controller.show_frame(Dashboard)
+
+
 
 
 class Create(tk.Frame):

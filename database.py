@@ -103,10 +103,10 @@ class database():
         self.conn.commit()
         return True
     def get_user_performance(self, user_id):
-        self.cursor.execute('''SELECT topics.topic_name, user_performance.numberQsAttempted, user_performance.numberQsCorrect,topics.total_questions
-                               FROM user_performance
-                               JOIN topics ON user_performance.topic_id = topics.id
-                               WHERE user_performance.user_id = ?''', (user_id,))
+        self.cursor.execute('''SELECT t.topic_name,t.total_questions,up.numberQsAttempted,up.numberQsCorrect
+                            FROM user_performance AS up JOIN topics AS t ON up.topic_id=t.id
+                            WHERE up.user_id=?''', (user_id,))
+
         return self.cursor.fetchall()
     def get_username(self, user_id):
         self.cursor.execute("SELECT username FROM users WHERE id = ?", (user_id,))
