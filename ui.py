@@ -318,8 +318,13 @@ class Dashboard(tk.Frame):
             self.controller.current_user))
         #Updates the best/worst topic statistics
         best,worst=self.get_bestworst_topics()
-        self.besttopic_value.config(text=(best))
-        self.worsttopic_value.config(text=worst)
+        if best != None and worst!= None:
+            self.besttopic_value.config(text=(best))
+            self.worsttopic_value.config(text=worst)
+        else: 
+
+            self.besttopic_value.config(text=('--'))
+            self.worsttopic_value.config(text='--')
     #gets the user's progress from the database, turns each record into an object
     #and returns a list of objects sorted by completion percentage
     def get_progress(self):
@@ -355,9 +360,13 @@ class Dashboard(tk.Frame):
         for i in topics:
             accuracy=i[2] / i[1]
             accuracies[i[0]]=accuracy
-        besttopic= max(accuracies, key=accuracies.get)
-        worsttopic=min(accuracies, key= accuracies.get)
-        return(besttopic,worsttopic)
+
+        if accuracies:
+            besttopic= max(accuracies, key=accuracies.get)
+            worsttopic=min(accuracies, key= accuracies.get)
+            return(besttopic,worsttopic)
+        else:
+            return (None,None)
         
 class Quiz(tk.Frame):
     def __init__(self,parent,controller,database):
@@ -448,56 +457,112 @@ class Quiz(tk.Frame):
         self.submit_button.grid(row=5,column=4,sticky='ew', padx=(10,0))
     def start_quiz(self):
         self.generate_questions()
+        print(self.questionqueue)
         self.display_question(self.questionqueue[self.currentquestionindex])
     def generate_questions(self):
-        ##Fetches the question ids from the database and randomly selects a number of questions to be used in the quiz
-        available_questions = self.database.get_question_ids(current_user_id=self.controller.current_user)
+        ##Fetches the question ids from the database
+        #  and randomly selects a number of questions to be used in the quiz
+        available_questions = self.database.get_question_ids(
+            current_user_id=self.controller.current_user)
         self.questionqueue=[]
         weights=[]
-        topicnames=[]
+        topicnames=self.database.get_topic_names()
+        topic_to_weights={}
+
+        #pulls topics which users have already attempted, returning a list of tuples 
+        #fields: topic_name,total_questions,numberQsAttempted,numberQsCorrect,
         topics=self.database.get_user_performance(self.controller.current_user)
-        for i in topics:
-            topic_name,total_questions,numberQsAttempted,numberQsCorrect,= i
-            print(f'numQsAttempted:{numberQsAttempted},numberQsCorrect:{numberQsCorrect}')
-            if self.database.get_topic_attempts(self.controller.current_user,topic_name)==0:
-                    total_attempts=1
-            else:
-                    total_attempts=self.database.get_topic_attempts(self.controller.current_user,topic_name=topic_name)
-            print(total_attempts)
-            topic_completion = (numberQsAttempted / total_questions) 
-            dampened_completion= topic_completion ** 0.5 
-            topic_accuracy=numberQsCorrect/total_attempts
-            topic_mastery= dampened_completion * topic_accuracy
-            topic_difficulty=self.database.get_topic_difficulty(topic_name=topic_name) / 10
-            if topic_mastery < 1:
+
+        #if the user has not attempted any topics, 
+        # we assign each topic a default mastery level of 0.5 
+        #and calculate weights using topic difficulty
+        if not topics:
+            topic_mastery=0.5
+            for topic_name in topicnames:
+                topic_difficulty=self.database.get_topic_difficulty(
+                    topic_name=topic_name) / 10
+            
                 topic_mastery= 1.01 - topic_mastery 
                 topic_weight=topic_mastery*topic_difficulty
 
-            weights.append(topic_weight)
+                weights.append(topic_weight)
 
-            topicnames.append(topic_name)
-            print(f'name:{topic_name},\n mastery:{topic_mastery},\n topic_weight:{topic_weight},\n TOPIC difficulty{topic_difficulty},\n completion:{topic_completion},\n accuracy:{topic_accuracy} \n ==========')
-        maxquestions=len(available_questions)
-        count= r.randint(3,maxquestions)
-        self.selectedtopics = r.choices(topicnames,weights=weights,k=count)
-        questions_per_topic=Counter(self.selectedtopics)
-        print(questions_per_topic)
-        print(f"selected topics: {self.selectedtopics}") 
+                maxquestions=len(available_questions)
+                
+            count= r.randint(3,maxquestions)
+
+            self.selectedtopics = r.choices(topicnames,weights=weights,k=count)
+            questions_per_topic=Counter(self.selectedtopics)
+
+        else:
+            #if the user has attempted topics , we iterate through each 
+            # of the tuples returned and unpack them into seperate stores
+            for i in topics:
+                topic_name,total_questions,numberQsAttempted,numberQsCorrect,= i
+                topic_difficulty=self.database.get_topic_difficulty(
+                    topic_name=topic_name)/10
+                #pulls the amount of questions the user has answered in this topic
+                if self.database.get_topic_attempts(
+                    self.controller.current_user,topic_name)==0:
+                    total_attempts=1
+                else:
+                    total_attempts=self.database.get_topic_attempts(
+                        self.controller.current_user,topic_name=topic_name)
+
+                #calculates completion 
+                topic_completion = (numberQsAttempted / total_questions) 
+                dampened_completion= topic_completion ** 0.5 
+                #calculates accuracy
+                topic_accuracy=numberQsCorrect/total_attempts
+                #calculates mastery and inverts it
+                topic_mastery= dampened_completion * topic_accuracy
+                topic_mastery= 1.01 - topic_mastery 
+                #determines a weight for the topic using the calculated values
+                topic_weight=topic_mastery*topic_difficulty
+                #maps each weight to its topic name
+                topic_to_weights[topic_name]=topic_weight
+
+            #calculates weights for topics with no attempts
+            for i in topicnames:
+                if i not in topic_to_weights:
+                    weight= 0.5 * self.database.get_topic_difficulty(i)/10
+                    topic_to_weights[i]=weight
+
+            #divides the dictionary into lists
+            # allowing us to use them as parameters when selecting questions
+            weights=list(topic_to_weights.values())
+            usertopicnames=list(topic_to_weights.keys())
+
+            #determines the amount of questions to be used
+            #using the amount of available questions as an upper bound
+            maxquestions=len(available_questions)
+            count= r.randint(3,maxquestions)
+
+            #randomly selects the amount of topics determined
+            #  by count from the list of topics and their weights
+            self.selectedtopics = r.choices(usertopicnames,weights=weights,k=count)
+
+            #counts how many times each topic was selected
+            questions_per_topic=Counter(self.selectedtopics)
+
+
+
         for topic_name,amount in questions_per_topic.items():
             questions=self.database.get_questions_by_topic(controller.current_user,topic_name=topic_name)
             question_weights=[]
             for i in questions:
                 attempts=self.database.get_attempts_by_question(user_id=controller.current_user,question_id=i)
                 if attempts==0:
-                    distanceindays=14
-                FMT = "%Y-%m-%d %H:%M:%S"
+                    days_since_attempt=14
+                else:
+                    FMT = "%Y-%m-%d %H:%M:%S"
 
-                last_attempt = datetime.strptime(
-                    self.database.get_most_recent_attempt(user_id=controller.current_user, question_id=2), FMT
-                ).replace(tzinfo=timezone.utc)
+                    last_attempt = datetime.strptime(
+                        self.database.get_most_recent_attempt(user_id=controller.current_user, question_id=i), FMT
+                    ).replace(tzinfo=timezone.utc)
 
-                now = datetime.now(timezone.utc)
-                days_since_attempt = (now - last_attempt).total_seconds() / 86400
+                    now = datetime.now(timezone.utc)
+                    days_since_attempt = (now - last_attempt).total_seconds() / 86400
 
                 days_since_attempt+=1
                 dampened_attempts=attempts*0.5

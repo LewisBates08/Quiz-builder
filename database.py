@@ -211,3 +211,6 @@ class database():
     def get_most_recent_attempt(self,user_id,question_id):
         self.cursor.execute('''SELECT MAX(attempt_date) FROM user_questions WHERE user_id=? AND question_id=?''',(user_id,question_id))
         return self.cursor.fetchone()[0]
+    def get_topic_names(self):
+        self.cursor.execute('''SELECT topic_name FROM topics''')
+        return [row[0] for row in self.cursor.fetchall()]
