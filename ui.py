@@ -4,7 +4,8 @@ from tkinter import messagebox
 import random as r
 from dataclasses import dataclass
 import database as db
-
+from collections import Counter
+from datetime import datetime,timedelta,timezone
 
 main_color = "#2570C0"
 accent_color = "#7FD0FB"
@@ -175,6 +176,7 @@ class Login(tk.Frame):
             self.password_entry.delete(0, tk.END)
             self.controller.current_user=userid
             self.controller.frames[Dashboard].update_dashboard()
+            self.controller.frames[Quiz].start_quiz()
         else:
             self.controller.login_error(Login)
 
@@ -275,58 +277,77 @@ class Dashboard(tk.Frame):
     # updates the progress bars based on the user's performance in the database
     def update_progressbars(self):
         self.topics=self.get_progress()
+        # Store the labels in the same order as the progress bars
+        labels = [
+            self.topic1_label,
+            self.topic2_label,
+            self.topic3_label
+        ]
+        # Update each of the three topic positions
         for i in range(3):
-            try:
-                self.topic1_label.config(text=f"{self.topics[i].topic}: {self.topics[i].topic_completion}%")
-                self.progressbars[i]['value']=(self.topics[i].topic_completion)
-            except IndexError:
-                pass
-    # updates the dashboard with the user's username 
+            if i < len(self.topics):
+                topic = self.topics[i]
+                 # Display the topic name and completion percentage
+                labels[i].config(
+                    text=f"{topic.topic}: {topic.topic_completion}%"
+                )
+                # Fill the progress bar to match the completion percentage
+                self.progressbars[i]["value"] = topic.topic_completion
+            else:
+                labels[i].config(text="--")
+                self.progressbars[i]["value"] = 0
     def update_dashboard(self):
         self.username=self.database.get_username(self.controller.current_user)
         #Updates the header to display the username
-        self.message_label = tk.Label(self.header, text=f"Welcome , {self.username}", font=("Helvetica", 14), bg=main_color, fg=white_color)
+        self.message_label = tk.Label(self.header,
+                                       text=f"Welcome , {self.username}",
+                                       font=("Helvetica", 14), bg=main_color, 
+                                       fg=white_color)
         self.message_label.grid(row=1, column=5, sticky='nsew')
         self.update_progressbars()
-        #Updates the number of quizzes completed,questions answered and topics covered
-        self.quizzescompleted_value.config(text=self.database.get_quiz_count(self.controller.current_user))
-        self.questionsanswered_value.config(text= self.database.get_question_count(self.controller.current_user))
-        self.topic_value.config(text=self.database.get_topic_count(self.controller.current_user))
+        #Updates the number of quizzes completed,
+        # questions answered and topics covered
+
+        self.quizzescompleted_value.config(text=self.database.get_quiz_count(
+            self.controller.current_user))
+        
+        self.questionsanswered_value.config(text= self.database.get_question_count(
+            self.controller.current_user))
+        
+        self.topic_value.config(text=self.database.get_topic_count(
+            self.controller.current_user))
         #Updates the best/worst topic statistics
         best,worst=self.get_bestworst_topics()
         self.besttopic_value.config(text=(best))
         self.worsttopic_value.config(text=worst)
-    #gets the user's progress from the database, turns each record into an object and returns a list of objects sorted by completion percentage
+    #gets the user's progress from the database, turns each record into an object
+    #and returns a list of objects sorted by completion percentage
     def get_progress(self):
-        # Store the topic objects used to update the dashboard
+        #stores each topic object created
         topics = []
-        # Retrieve performance records for the currently logged-in user
+        #Gets user performance data and topic data using a JOIN statement
         self.performance = self.database.get_user_performance(self.controller.current_user)
-        # Print the retrieved records for debugging
-        print(self.performance)
         for i in self.performance:
-            # Unpack the topic name, attempt count, correct count and question total
             topic_name,numberQsAttempted,numberQsCorrect,total_questions,= i
 
-            # Calculate completion only when the topic contains questions
+        #Validates that the topic has questions
             if total_questions > 0:
                 topic_completion = (numberQsAttempted / total_questions) * 100
-                # Cap completion at 100% because repeated attempts can raise the count
                 if topic_completion>100:
                     topic_completion=100
             else:
-                # Avoid division by zero for topics with no questions
                 topic_completion = 0
-            # Keep each topic's statistics together in a uprogress object
+
+            #creates an object of the question to allow for 
+            # easy access of each records attributes
             topic= uprogress(topic=topic_name,
             numberQsAttempted=numberQsAttempted,
             numberQsCorrect=numberQsCorrect,
             total_questions=total_questions,topic_completion=topic_completion)
-            # Add this topic to the list before sorting
             topics.append(topic)
-            #Sorts the topics based on completion percentage in descending order
+
+        #Sorts the topics based on completion percentage in descending order
         topics.sort(key=lambda x: x.topic_completion, reverse=True)
-        # Return up to three topics with the highest completion percentages
         return topics[:3]
     def get_bestworst_topics(self):
         topics=self.database.get_user_performance(self.controller.current_user)
@@ -346,14 +367,12 @@ class Quiz(tk.Frame):
         self.database=db.database()
         self.questionanswered=0
         self.questionqueue=[]
-        self.generate_questions()
         self.currentquestionindex=0
         self.responses=[]
         
         self.create_layout()
         self.create_subframes()
         self.create_widgets()
-        self.display_question(self.questionqueue[self.currentquestionindex])
 
     def create_layout(self):
         #Defines grid layout
@@ -427,13 +446,80 @@ class Quiz(tk.Frame):
                                           fg=white_color, relief='raised', command=self.submit_answer)
         
         self.submit_button.grid(row=5,column=4,sticky='ew', padx=(10,0))
-
+    def start_quiz(self):
+        self.generate_questions()
+        self.display_question(self.questionqueue[self.currentquestionindex])
     def generate_questions(self):
-        #Fetches the question ids from the database and randomly selects a number of questions to be used in the quiz
-        available_questions = self.database.get_question_ids(self.controller.current_user)
-        count= r.randint(3,5)
-        self.questionqueue = r.sample(available_questions, count)
-        print(f"Generated question queue: {self.questionqueue}")  # Debugging statement
+        ##Fetches the question ids from the database and randomly selects a number of questions to be used in the quiz
+        available_questions = self.database.get_question_ids(current_user_id=self.controller.current_user)
+        self.questionqueue=[]
+        weights=[]
+        topicnames=[]
+        topics=self.database.get_user_performance(self.controller.current_user)
+        for i in topics:
+            topic_name,total_questions,numberQsAttempted,numberQsCorrect,= i
+            print(f'numQsAttempted:{numberQsAttempted},numberQsCorrect:{numberQsCorrect}')
+            if self.database.get_topic_attempts(self.controller.current_user,topic_name)==0:
+                    total_attempts=1
+            else:
+                    total_attempts=self.database.get_topic_attempts(self.controller.current_user,topic_name=topic_name)
+            print(total_attempts)
+            topic_completion = (numberQsAttempted / total_questions) 
+            dampened_completion= topic_completion ** 0.5 
+            topic_accuracy=numberQsCorrect/total_attempts
+            topic_mastery= dampened_completion * topic_accuracy
+            topic_difficulty=self.database.get_topic_difficulty(topic_name=topic_name) / 10
+            if topic_mastery < 1:
+                topic_mastery= 1.01 - topic_mastery 
+                topic_weight=topic_mastery*topic_difficulty
+
+            weights.append(topic_weight)
+
+            topicnames.append(topic_name)
+            print(f'name:{topic_name},\n mastery:{topic_mastery},\n topic_weight:{topic_weight},\n TOPIC difficulty{topic_difficulty},\n completion:{topic_completion},\n accuracy:{topic_accuracy} \n ==========')
+        maxquestions=len(available_questions)
+        count= r.randint(3,maxquestions)
+        self.selectedtopics = r.choices(topicnames,weights=weights,k=count)
+        questions_per_topic=Counter(self.selectedtopics)
+        print(questions_per_topic)
+        print(f"selected topics: {self.selectedtopics}") 
+        for topic_name,amount in questions_per_topic.items():
+            questions=self.database.get_questions_by_topic(controller.current_user,topic_name=topic_name)
+            question_weights=[]
+            for i in questions:
+                attempts=self.database.get_attempts_by_question(user_id=controller.current_user,question_id=i)
+                if attempts==0:
+                    distanceindays=14
+                FMT = "%Y-%m-%d %H:%M:%S"
+
+                last_attempt = datetime.strptime(
+                    self.database.get_most_recent_attempt(user_id=controller.current_user, question_id=2), FMT
+                ).replace(tzinfo=timezone.utc)
+
+                now = datetime.now(timezone.utc)
+                days_since_attempt = (now - last_attempt).total_seconds() / 86400
+
+                days_since_attempt+=1
+                dampened_attempts=attempts*0.5
+                dampened_attempts+=1
+                weight=days_since_attempt/ dampened_attempts
+                    
+                question_weights.append(weight)
+            print(f'questions:{questions}')
+            print(f'weights:{question_weights}')
+            if amount>len(questions):
+                amount=len(questions)
+            for i in range(amount):
+                
+                selectedquestion=r.choices(questions,weights=question_weights,k=1)[0]
+                print(selectedquestion)
+                index = questions.index(selectedquestion)
+
+                questions.pop(index)
+                question_weights.pop(index)
+                self.questionqueue.append(selectedquestion)
+                
+        print(f'questionqueue:{self.questionqueue}')
 #Saves the response to be marked later, increments the counters, and displays the next question
     def submit_answer(self):
         selected_answer = self.answer.get()#Gets the value of the selected answer
@@ -472,19 +558,21 @@ class Quiz(tk.Frame):
         score=0
         for i in range(len(self.questionqueue)):
             question=self.loadQuestion(self.questionqueue[i])
-            self.database.write_question(user_id=self.controller.current_user,
-                                         question_id=self.questionqueue[i],
-                                         user_answer=self.responses[i],
-                                         is_correct=self.responses[i]==question.correct)
             if self.responses[i]== question.correct:
                 score+=1
                 self.database.update_user_performance(user_id=self.controller.current_user,
                                                       topic_id=question.topic,
-                                                      is_correct=True)
+                                                      is_correct=True, 
+                                                      question_id=self.questionqueue[i])
             else:
                 self.database.update_user_performance(user_id=self.controller.current_user,
                                                       topic_id=question.topic,
-                                                      is_correct=False)
+                                                      is_correct=False,
+                                                      question_id=self.questionqueue[i])
+            self.database.write_question(user_id=self.controller.current_user,
+                                question_id=self.questionqueue[i],
+                                user_answer=self.responses[i],
+                                is_correct=self.responses[i]==question.correct)
         percentage_accuracy=score / len(self.questionqueue)
         self.database.update_quizzes(self.controller.current_user,score=percentage_accuracy)
         return score 
@@ -560,6 +648,8 @@ class Quiz(tk.Frame):
             self.option4.config(text=options[3],value=options[3])
         else:
             pass
+        self.question_number_label.config(text=f'Question {self.currentquestionindex}')
+        self.questions_remaining_label.config(text=f'Questions Remaining: {self.questionsremaining()}')
 class Review(tk.Frame):
     def __init__(self,parent,controller,database):
         super().__init__(parent)

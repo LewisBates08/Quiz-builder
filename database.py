@@ -125,17 +125,24 @@ class database():
         for i in self.cursor.fetchall():
             ids.append(i[0])
         return ids
-    def update_user_performance(self, user_id, topic_id, is_correct):
+    def update_user_performance(self, user_id, topic_id, is_correct,question_id):
         #checks if the user already has a record this topic 
         self.cursor.execute('''SELECT numberQsAttempted, numberQsCorrect 
                                FROM user_performance 
                                WHERE user_id = ? AND topic_id = ?''', (user_id, topic_id))
         result = self.cursor.fetchone()
+        self.cursor.execute('''SELECT is_correct FROM user_questions WHERE question_id = ? AND user_id = ?''',(question_id,user_id))
+        if self.cursor.fetchone():
+            qAttempted=True
+        else:
+            qAttempted= False
         #if the user already has a record for this topic, we increment the number of questions
         #if the question was answered correctly, we also increment the number of correct questions
+
         if result:
             numberQsAttempted, numberQsCorrect = result
-            numberQsAttempted += 1
+            if qAttempted == False:
+                numberQsAttempted += 1
             if is_correct:
                 numberQsCorrect += 1
         #update the record in the database with the new values
@@ -143,6 +150,7 @@ class database():
                                    SET numberQsAttempted = ?, numberQsCorrect = ? 
                                    WHERE user_id = ? AND topic_id = ?''', 
                                    (numberQsAttempted, numberQsCorrect, user_id, topic_id))
+    
         # if the user does not have a record for this topic, we create a new record with the initial values
         else:
             numberQsAttempted = 1
@@ -178,3 +186,28 @@ class database():
     def get_topic_count(self,user_id):
         self.cursor.execute('''SELECT topic_id FROM user_performance WHERE user_id = ?''',(user_id,))
         return len(self.cursor.fetchall())
+    def get_topic_attempts(self, user_id, topic_name):
+            self.cursor.execute(
+                '''SELECT COUNT(*)
+                FROM user_questions AS uq
+                JOIN questions AS q ON uq.question_id = q.id
+                JOIN topics AS t ON q.topic_id = t.id
+                WHERE uq.user_id = ? AND t.topic_name = ?''',
+                (user_id, topic_name)
+            )
+            return self.cursor.fetchone()[0]
+    def get_topic_difficulty(self,topic_name):
+        self.cursor.execute('''SELECT topic_difficulty FROM topics WHERE topic_name=?''',(topic_name,))
+        return self.cursor.fetchone()[0]
+    def get_questions_by_topic(self,user_id,topic_name):
+        self.cursor.execute('''SELECT q.id FROM questions AS q 
+        JOIN topics AS t ON q.topic_id=t.id 
+        WHERE (q.user_id IS NULL OR q.user_id = ? )AND t.topic_name=?''',
+        (user_id,topic_name))
+        return [row[0] for row in self.cursor.fetchall()]
+    def get_attempts_by_question(self,user_id,question_id):
+        self.cursor.execute('''SELECT COUNT(id) FROM user_questions WHERE user_id=? AND question_id=?''',(user_id,question_id))
+        return self.cursor.fetchone()[0]
+    def get_most_recent_attempt(self,user_id,question_id):
+        self.cursor.execute('''SELECT MAX(attempt_date) FROM user_questions WHERE user_id=? AND question_id=?''',(user_id,question_id))
+        return self.cursor.fetchone()[0]
